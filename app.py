@@ -4,7 +4,7 @@ from interfaces.hashing import *
 from robot import Robot
 import logging, time, sys
 
-DATABASE = Database('databases/RobotDatabase.db')
+DATABASE = Database("database/test.db", app.logger)
 ROBOT = Robot(DATABASE)
 
 #---CONFIGURE APP---------------------------------------------------
@@ -75,11 +75,12 @@ def videofeed():
 #Shut down the web server if necessary
 @app.route('/camera_test', methods=['GET','POST'])
 def camera_test():
-    ROBOT.test_camera(timelimit=100)
+    ROBOT.CAMERA.detect_all()
     return jsonify({'message':'Testing Camera'})
 
 @app.route('/logout')
 def logout():
+    app.logger.info('logging off')
     session.clear()
     return redirect('/')
 

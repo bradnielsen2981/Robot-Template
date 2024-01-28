@@ -12,7 +12,7 @@ import HiwonderSDK.ActionGroupControl as actiongroup
 
 from loggerinterface import setup_logger
 
-class HiwonderInterface():
+class MasterPiInterface():
 
     #Initialise timelimit and logging
     def __init__(self):
@@ -133,7 +133,7 @@ class HiwonderInterface():
     
     #reset the arm
     def look_down(self):
-        actiongroup.runAction("default")
+        actiongroup.runAction("lookdown")
         return
     
     #robot lookup
@@ -189,10 +189,12 @@ class HiwonderInterface():
 
 #main execution point for testing purposes
 if __name__ == '__main__':
-    ROBOT = HiwonderInterface()
+    ROBOT = MasterPiInterface()
     ROBOT.stop()
     input("press enter to begin")
-    ROBOT.rotate_speed_time()
+    ROBOT.look_up()
+    time.sleep(5)
+    ROBOT.look_down()
     #ROBOT.move_direction_time(power=40, direction=90, rotationspeed=0.08, timelimit=2)
     ROBOT.stop()
 

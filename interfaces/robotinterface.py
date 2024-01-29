@@ -257,12 +257,14 @@ class RobotInterface(MasterPiInterface):
     # Pick up a centered colour object in the look down position. Keeps current arm rotation
     def pick_up_centered_object_with_look_down(self, y):
         
-        self.command = "rotate_robot_to_arm_rotation"
+        self.command = "pick_up_centered_object_with_look_down"
         data = {}
         data['command'] = self.command
         data['starttime'] = time.time()
-        if y >= 225:
+        #if y >= 225:
+        if y >= 100:
             deltaY = int((480-y)/240*300)
+            print(deltaY)
             self.grab_with_current_arm_rotation(deltaY)
             self.reset_arm()
             data['pickup'] = True
@@ -300,7 +302,7 @@ class RobotInterface(MasterPiInterface):
                     width, height = size
                     x, y = center
                     deltaY = 480-y
-                    print("DeltaY", deltaY, "Width", width, "Angle", angle)
+                    #print("DeltaY", deltaY, "Width", width, "Angle", angle)
                     if ((deltaY < 100) and (width > 250) and (width < 500) and (abs(angle) < 5)):
                         data['success'] = True
                         break
@@ -324,7 +326,15 @@ class RobotInterface(MasterPiInterface):
         self.set_boardLED_color(colour)
         endtime = time.time() + timelimit
         centered = False
-
+        
+        distance = 145
+        if self.camera_pos == "lookdown":
+            distance = 250
+        elif self.camera_pos == "lookup":
+            distance = 90
+        elif self.camera_pos == "default":
+            distance = 145    
+            
         while ((time.time() < endtime) and (self.command == "move_toward_colour_detected")):
             if not self.show_camera_window():
                 break
@@ -341,7 +351,8 @@ class RobotInterface(MasterPiInterface):
                     deltaY = 480-y
                     deltaX = 320-x
                     theta_degrees = int(math.degrees(math.atan2(deltaX,deltaY)) + 90)
-                    if deltaY > 90:
+                    
+                    if deltaY > distance:
                         if mode == 'drifting':
                             self.move_direction(power=33, direction=theta_degrees, rotationspeed=0)
                         elif mode == 'turning':
@@ -411,7 +422,6 @@ class RobotInterface(MasterPiInterface):
 # TEST ROBOT CODE
 if __name__ == '__main__':
     ROBOT = RobotInterface()
-    ROBOT.move_direction_time(power=-35, direction=90, rotationspeed=0, timelimit=0.5)
     ROBOT.stop()
     ROBOT.look_up()
     input("Press Enter to Start")
@@ -422,7 +432,7 @@ if __name__ == '__main__':
     cv2.namedWindow('Detection Mode')
     cv2.resizeWindow('Detection Mode', 640, 480)
     time.sleep(1)
-    ROBOT.auto_detection(timelimit=5)
+        
     #ROBOT.SOUND.load_mp3("../static/music/missionimpossible.mp3")
     #ROBOT.SOUND.play_music(1)
     ROBOT.SOUND.say("Searching for colours")
@@ -438,7 +448,6 @@ if __name__ == '__main__':
     
     if colour_detected:
         ROBOT.SOUND.say(colour_detected + " was detected.")
-        input("Press Enter to Start")
         ROBOT.SOUND.say("Moving towards colour.")
         print("Moving towards colour.")
         data = ROBOT.move_toward_colour_detected(colour=colour_detected)
@@ -468,13 +477,19 @@ if __name__ == '__main__':
 
             input("Press Enter to return to box")
             ROBOT.look_up()
-            data = ROBOT.move_direction_until_detection(movetype="turnright", distanceto=250, detection_types=['colour'], detection_colours=['black'], timelimit=5, confirmlevel=1)
-            data = ROBOT.move_toward_colour_detected(colour="black")
-            ROBOT.look_down()
-            data = ROBOT.move_toward_colour_detected(colour="black")
-            ROBOT.run_arm_action(actionname="putdown")
-            ROBOT.reset_arm()
-            ROBOT.SOUND.say("Mission successful")
+            ROBOT.SOUND.say("Searching for black")
+            data = ROBOT.move_direction_until_detection(movetype='turnright', distanceto=250, detection_types=['colour'], detection_colours=['black'], timelimit=5, confirmlevel=1)
+            data = ROBOT.move_toward_colour_detected(colour='black')
+            
+            if 'found' in data['detect_colour']['black']:
+                print('Black detected.')
+                ROBOT.SOUND.say('Black detected.')
+                ROBOT.look_down()
+                ROBOT.SOUND.say('Moving closer')
+                data = ROBOT.move_toward_colour_detected(colour='black')
+                ROBOT.run_arm_action(actionname='putdown')
+                ROBOT.reset_arm()
+                ROBOT.SOUND.say("Mission successful")
      
         elif data['success'] == False:
             ROBOT.SOUND.say("Pick up unsuccessful")

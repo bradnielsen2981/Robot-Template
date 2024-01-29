@@ -21,6 +21,7 @@ class MasterPiInterface():
         self.chassis = mecanum.MecanumChassis()
         self.status = "Ready"
         self.arm_rotation = 1500 #centre position
+        self.camera_pos = "default"
         self.logger = logging.getLogger('HiwonderInterface')
         setup_logger(self.logger, '../logs/robot.log')
         return
@@ -129,16 +130,19 @@ class MasterPiInterface():
     #reset the arm
     def reset_arm(self):
         actiongroup.runAction("default")
+        self.camera_pos = "default"
         return
     
     #reset the arm
     def look_down(self):
         actiongroup.runAction("lookdown")
+        self.camera_pos = "lookdown"
         return
     
     #robot lookup
     def look_up(self):
         actiongroup.runAction("lookup")
+        self.camera_pos = "lookup"
         return        
     
     # Stop current arm action
@@ -154,14 +158,15 @@ class MasterPiInterface():
         return
     
     # Pick up a horizontally aligned object but adjust for the vertical position of the object
-    def grab_with_current_arm_rotation(self, deltaY=300): #set up to use a range between 0 and 300
+    def grab_with_current_arm_rotation(self, deltaY=40): #set up to use a range between 0 and 300
         Board.setPWMServoPulse(1, 1864, 1000)
         time.sleep(1)
-        Board.setPWMServoPulse(3, 800+deltaY*2, 2000)   #Board.setPWMServoPulse(3, 1100, 2000)
+        #Board.setPWMServoPulse(3, 800+deltaY*2, 2000)   #Board.setPWMServoPulse(3, 1000, 2000)
+        Board.setPWMServoPulse(3, 900+int(deltaY/1.5), 2000) #900+int(deltaY/2)
         time.sleep(2)
-        Board.setPWMServoPulse(4, 2200-deltaY, 2000)  #Board.setPWMServoPulse(4, 1800, 2000) 
+        Board.setPWMServoPulse(4, 2500-int(deltaY*1.7), 2000)  #Board.setPWMServoPulse(4, 1800, 2000) #2500-int(deltaY*2)
         time.sleep(2)
-        Board.setPWMServoPulse(5, 2200+deltaY, 2000)  #Board.setPWMServoPulse(5, 2500, 2000) 
+        Board.setPWMServoPulse(5, 2050+int(deltaY*1.25), 2000)  #Board.setPWMServoPulse(5, 2400, 2000)  #2000+deltaY
         time.sleep(2)
         Board.setPWMServoPulse(1, 1600, 2000) 
         time.sleep(2)
@@ -191,10 +196,6 @@ class MasterPiInterface():
 if __name__ == '__main__':
     ROBOT = MasterPiInterface()
     ROBOT.stop()
-    input("press enter to begin")
     ROBOT.look_up()
-    time.sleep(5)
-    ROBOT.look_down()
-    #ROBOT.move_direction_time(power=40, direction=90, rotationspeed=0.08, timelimit=2)
-    ROBOT.stop()
+    ROBOT.grab_with_current_arm_rotation()
 

@@ -4,14 +4,15 @@ from interfaces.hashing import *
 from robot import Robot
 import logging, time, sys
 
-DATABASE = Database("database/test.db", app.logger)
-ROBOT = Robot(DATABASE)
-
 #---CONFIGURE APP---------------------------------------------------
 app = Flask(__name__)
 logging.basicConfig(filename='logs/flask.log', level=logging.INFO)
 sys.tracebacklimit = 10
 app.config['SECRET_KEY'] = "Type in a secret line of text"
+
+#---EMBED OBJECTS---------------------------------------------------
+DATABASE = Database("database/test.db", app.logger)
+ROBOT = Robot(DATABASE)
 
 #---VIEW FUNCTIONS----------------------------------------------------
 # Login as the admin user
@@ -21,23 +22,19 @@ def login():
     if request.method == "POST":
         email = request.form['email']
         password = request.form['password']
-        if email == 'admin@admin' and password == 'password': 
-            print("GOT HERE")
+        if email == 'admin@admin' and password == 'admin': 
             session['userid'] = 1
-            if time.time() + 3 > ROBOT.starttime:
-                return redirect('./dashboard') #takes 3 seconds for the CAMERA to start
-            else: #wait for camera to start
-                time.sleep(3)
-                return redirect('./dashboard')
+            time.sleep(3)
+            return redirect('./mission') #takes 3 seconds for the CAMERA to start
     return render_template("login.html")
 
 # Dashboard for the robot
-@app.route('/dashboard', methods=['GET','POST'])
-def dashboard():
+@app.route('/mission', methods=['GET','POST'])
+def mission():
     frame = ROBOT.CAMERA.get_jpeg_frame()
     if not 'userid' in session:
         return redirect('/')
-    return render_template('dashboard.html')
+    return render_template('mission.html')
 
 # YOUR FLASK CODE------------------------------------------------------------------------
 
@@ -63,7 +60,7 @@ def videostream():
         else:
             return '', 204 
 
-#embeds the videofeed by returning a continual stream as above
+# Embeds the videofeed by returning a continual stream as above
 @app.route('/videofeed')
 def videofeed():
     if ROBOT:
@@ -72,19 +69,28 @@ def videofeed():
     else:
         return '', 204
 
-#Shut down the web server if necessary
-@app.route('/camera_test', methods=['GET','POST'])
-def camera_test():
-    ROBOT.CAMERA.detect_all()
-    return jsonify({'message':'Testing Camera'})
+# Shut down the web server if necessary
+@app.route('/turn_on_detection', methods=['GET','POST'])
+def turn_on_detection():
+    if ROBOT:
+        ROBOT.CAMERA.detect_all(exclude_colours=['black'])
+    return jsonify({'message':'Detection mode on!!'})
 
+# Shut down the web server if necessary
+@app.route('/turn_off_detection', methods=['GET','POST'])
+def turn_off_detection():
+    if ROBOT:
+        ROBOT.CAMERA.end_detection()
+    return jsonify({'message':'Detection mode off!!'})
+
+# Log out
 @app.route('/logout')
 def logout():
     app.logger.info('logging off')
     session.clear()
     return redirect('/')
 
-#Shut down the web server if necessary
+# Shut down the web server if necessary
 @app.route('/shutdown', methods=['GET','POST'])
 def shutdown():
     print("Shutting Down")
@@ -95,6 +101,6 @@ def shutdown():
     return jsonify({'message':'Shutting Down'})
 
 #---------------------------------------------------------------------------
-#main method called web server application
+# main method called web server application
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True) #runs a local server on port 5000

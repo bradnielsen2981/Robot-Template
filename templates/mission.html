@@ -1,0 +1,23 @@
+{% extends "layout.html" %}
+{% block content %}
+    <div class="page-header" id="banner">
+        <div class="row">
+            <h1>Mission</h1>
+        </div>
+    </div>
+    <div id="dashboard">
+        <div class="row">
+            <br>
+        </div>
+        <div class="row">
+            <img src="/videofeed" class="videofeed" height="480px" width="640px">
+        </div>
+        <div class="row">
+            <button id="turn_on_detection_button" type="button" class="btn btn-success">Turn on Detection <i class="fa-solid fa-arrows-to-eye"></i></button>
+            <button id="turn_off_detection_button" type="button" class="btn btn-danger">Turn off Detection</button>
+        </div>
+    </div>
+{% endblock %}
+{% block scripts %}
+    <script src="/static/js/mission.js"></script> 
+{% endblock %}

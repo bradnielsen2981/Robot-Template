@@ -392,7 +392,7 @@ class RobotInterface(MasterPiInterface):
         endtime = time.time() + timelimit
         
         #self.CAMERA.detection_data_expire_time = 0 #when auto_detection is turned off, the expire time will be reset
-        self.CAMERA.detect_all()
+        self.CAMERA.detect_all(exclude_colours=['black','white'])
         
         while ((time.time() < endtime) and (data['command'] == "auto_detection")): #this can not be running when automated_mode is on
             if not self.show_camera_window():
@@ -432,69 +432,10 @@ if __name__ == '__main__':
     cv2.namedWindow('Detection Mode')
     cv2.resizeWindow('Detection Mode', 640, 480)
     time.sleep(1)
-        
-    #ROBOT.SOUND.load_mp3("../static/music/missionimpossible.mp3")
-    #ROBOT.SOUND.play_music(1)
-    ROBOT.SOUND.say("Searching for colours")
-    print("Searching for colours")
-    data = ROBOT.move_direction_until_detection(movetype='turnleft', distanceto=250, detection_types=['colour'],
-                                                detection_colours=['red','green','blue'], timelimit=5, confirmlevel=1)
-    print(data)
-    colour_detected = None
-    for colour in data['detect_colour'].keys():
-        if 'found' in data['detect_colour'][colour]:
-            colour_detected = colour
-            break  #choose the first colour found
     
-    if colour_detected:
-        ROBOT.SOUND.say(colour_detected + " was detected.")
-        ROBOT.SOUND.say("Moving towards colour.")
-        print("Moving towards colour.")
-        data = ROBOT.move_toward_colour_detected(colour=colour_detected)
-        print(data)
-        
-        ROBOT.look_down()
-        ROBOT.SOUND.say("Moving closer to colour.")
-        print("Moving closer to colour.")
-        data = ROBOT.move_toward_colour_detected(colour=colour_detected) #get closer
-        print(data)
-        
-        ROBOT.SOUND.say("Rotating arm to initiate pickup.")
-        print("Rotating arm.")
-        data = ROBOT.rotate_arm_until_colour_detected_is_centered(colour=colour_detected)
-        print(data)
-        
-        print("Pick up centered object")
-        data = ROBOT.pick_up_centered_object_with_look_down(data['y'])
-        print(data)
-        
-        print("Check if pick up was successful")
-        data = ROBOT.was_object_pickup_successful(colour=colour_detected)
-        print(data)
-        
-        if data['success'] == True:
-            ROBOT.SOUND.say("Pick up successful")
-
-            input("Press Enter to return to box")
-            ROBOT.look_up()
-            ROBOT.SOUND.say("Searching for black")
-            data = ROBOT.move_direction_until_detection(movetype='turnright', distanceto=250, detection_types=['colour'], detection_colours=['black'], timelimit=5, confirmlevel=1)
-            data = ROBOT.move_toward_colour_detected(colour='black')
+    ROBOT.CAMERA.turn_on_output_text()
+    ROBOT.auto_detection(timelimit=60)
             
-            if 'found' in data['detect_colour']['black']:
-                print('Black detected.')
-                ROBOT.SOUND.say('Black detected.')
-                ROBOT.look_down()
-                ROBOT.SOUND.say('Moving closer')
-                data = ROBOT.move_toward_colour_detected(colour='black')
-                ROBOT.run_arm_action(actionname='putdown')
-                ROBOT.reset_arm()
-                ROBOT.SOUND.say("Mission successful")
-     
-        elif data['success'] == False:
-            ROBOT.SOUND.say("Pick up unsuccessful")
-    #ROBOT.SOUND.stop_music()
-    
     ROBOT.shutdown() 
     sys.exit(0)
     

@@ -332,11 +332,13 @@ class CameraInterface():
             self.detection_tasks.clear()    
     
     # Tests all detection tasks
-    def detect_all(self):
+    def detect_all(self, exclude_colours=[]):
         for key in self.detection_data.keys():
             self.add_detection_task(key)
         with self.colours_lock:
             self.detection_colours = list(self.lab_colours.keys())
+            for colour in exclude_colours:
+                self.detection_colours.remove(colour)
         return
     
     # turn on output text

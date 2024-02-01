@@ -1,1 +1,23 @@
-button { width:150px !important; }
+
+html, body { height:100vh; } 
+
+.container { padding-top:50px; }
+
+button { max-width:300px !important; margin:5px; }
+button#turn_on_detection_button { background-color:rgb(16, 184, 128) !important; }
+button#turn_on_detection_button:hover { background-color:rgb(6, 145, 99) !important; }
+
+.fa-solid, .fas { margin-left:10px !important; }
+
+#dashboard .row {
+    margin-left: 0px !important;
+    margin-top: 10px !important;
+    margin-bottom: 10px !important;
+}
+.row img { padding:0px; }
+
+.videofeed
+{
+    border:1px solid white;
+    max-width:640px;
+}

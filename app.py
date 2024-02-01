@@ -38,6 +38,47 @@ def mission():
 
 # YOUR FLASK CODE------------------------------------------------------------------------
 
+# Manual move forward until stop is pressed
+@app.route('/move_forward', methods=['GET','POST'])
+def move_forward():
+    if ROBOT:
+        ROBOT.SOUND.say("Moving forward")
+        ROBOT.move_direction_time(power=35, direction=90, timelimit=5)
+    return jsonify({'message':'moving forward'})
+
+# Manual stop
+@app.route('/stop', methods=['GET','POST'])
+def stop():
+    if ROBOT:
+        ROBOT.stop()
+        ROBOT.SOUND.say("Stopping")
+    return jsonify({'message':'stopping'})
+
+# Move towards the detected colour
+@app.route('/move_toward_colour', methods=['GET','POST'])
+def move_toward_colour_detected():
+    if request.method == "POST":
+        colour = request.form.get('colour')
+        if ROBOT:
+            try:
+                ROBOT.move_toward_colour_detected(colour=colour)
+            except Exception as e:
+                print(e)
+                ROBOT.stop_command()
+                ROBOT.SOUND.say("Stopping")
+    return jsonify({'message':'move_toward_colour_detected'})
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

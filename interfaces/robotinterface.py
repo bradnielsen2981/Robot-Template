@@ -25,7 +25,7 @@ class RobotInterface(MasterPiInterface):
     # stop the robot in its current process - most processes using timelimit and var self.command to exit loops
     def stop_command(self):
         self.command = "Ready"
-        super().stop()
+        self.stop()
         return
 
     # Move in direction until distance from detection. Movetypes can be none, forward, turn, circle, slideright, slideleft 

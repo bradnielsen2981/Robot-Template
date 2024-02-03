@@ -29,6 +29,7 @@ class SoundInterface():
         return
     
     def say(self, message):
+        #self.logger.info("Sound Interface: say " + message)
         self.engine.say(message) #gets robot to speak word or phrase
         self.engine.talkback()
         return

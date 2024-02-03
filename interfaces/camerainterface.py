@@ -90,7 +90,7 @@ class CameraInterface():
     
     # Function is run by thread...
     def update(self):
-        self.logger.info("Starting Camera Thread")
+        # self.logger.info("Starting Camera Thread")
         img = None
         time.sleep(2) #doesnt work without this, dont know why
         frame = None
@@ -401,7 +401,7 @@ class CameraInterface():
     # Stop the camera thread
     def stop(self):
         self.status = "Stop"
-        self.logger.info("Ending Camera Thread")
+        #self.logger.info("Ending Camera Thread")
         time.sleep(2)
         self.capture.release()
         return

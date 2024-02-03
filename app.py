@@ -12,7 +12,7 @@ app.config['SECRET_KEY'] = "Type in a secret line of text"
 
 #---EMBED OBJECTS---------------------------------------------------
 DATABASE = Database("database/test.db", app.logger)
-ROBOT = Robot(DATABASE)
+ROBOT = None
 
 #---VIEW FUNCTIONS----------------------------------------------------
 # Login as the admin user
@@ -31,43 +31,80 @@ def login():
 # Dashboard for the robot
 @app.route('/mission', methods=['GET','POST'])
 def mission():
-    frame = ROBOT.CAMERA.get_jpeg_frame()
+    loaded = 0
     if not 'userid' in session:
         return redirect('/')
-    return render_template('mission.html')
+    if ROBOT:
+        loaded = 1
+    return render_template('mission.html', robot_loaded=loaded)
+
+#load the robot
+@app.route('/load_robot', methods=['GET','POST'])
+def load_robot():
+    global ROBOT
+    if not ROBOT:
+        app.logger.info('Loading Robot')
+        ROBOT = Robot(DATABASE)
+        time.sleep(3) #takes 3 seconds to load the robot
+    return jsonify({'message':'robot loaded'})
 
 # YOUR FLASK CODE------------------------------------------------------------------------
 
 # Manual move forward until stop is pressed
 @app.route('/move_forward', methods=['GET','POST'])
 def move_forward():
+    app.logger.info('move forward')
     if ROBOT:
         ROBOT.SOUND.say("Moving forward")
-        ROBOT.move_direction_time(power=35, direction=90, timelimit=5)
+        try:
+            ROBOT.move_direction_time(power=35, direction=90, timelimit=5)
+        except Exception as e:
+            app.logger.info(e)
+            ROBOT.stop()
     return jsonify({'message':'moving forward'})
 
 # Manual stop
-@app.route('/stop', methods=['GET','POST'])
+@app.route('/stop_command', methods=['GET','POST'])
 def stop():
+    app.logger.info('stop')
     if ROBOT:
         ROBOT.stop()
-        ROBOT.SOUND.say("Stopping")
+        app.logger.info('Stopping')
+        ROBOT.SOUND.say('Stopping')
     return jsonify({'message':'stopping'})
 
 # Move towards the detected colour
 @app.route('/move_toward_colour', methods=['GET','POST'])
 def move_toward_colour_detected():
-    if request.method == "POST":
-        colour = request.form.get('colour')
-        if ROBOT:
-            try:
+    app.logger.info('move toward colour detected')
+    try:
+        if request.method == "POST":
+            colour = request.form['colour']
+            if ROBOT:
+                ROBOT.SOUND.say("Move toward colour")
                 ROBOT.move_toward_colour_detected(colour=colour)
-            except Exception as e:
-                print(e)
-                ROBOT.stop_command()
-                ROBOT.SOUND.say("Stopping")
+    except Exception as e:
+        print(e)
+        ROBOT.stop_command()
+        ROBOT.SOUND.say("Stopping")
     return jsonify({'message':'move_toward_colour_detected'})
 
+# Look down
+@app.route('/look_down', methods=['GET','POST'])
+def look_down():
+    app.logger.info('look down')
+    if ROBOT:
+        ROBOT.SOUND.say("Look down")
+        ROBOT.look_down()
+    return jsonify({'message':'look down'})
+
+# Look up
+@app.route('/look_up', methods=['GET','POST'])
+def look_up():
+    app.logger.info('look up')
+    if ROBOT:
+        ROBOT.look_up()
+    return jsonify({'message':'look up'})
 
 
 
@@ -79,14 +116,7 @@ def move_toward_colour_detected():
 
 
 
-
-
-
-
-
-
-
-# CAMERA CODE-----------------------------------------------------------------------
+# CAMERA CODE-(do not touch!!)-------------------------------------------------------
 # Continually gets the frame from the pi camera
 def videostream():
     """Video streaming generator function."""
@@ -110,16 +140,18 @@ def videofeed():
     else:
         return '', 204
 
-# Shut down the web server if necessary
+# Turn on detection mode
 @app.route('/turn_on_detection', methods=['GET','POST'])
 def turn_on_detection():
+    app.logger.info('turn on detection')
     if ROBOT:
         ROBOT.CAMERA.detect_all(exclude_colours=['black'])
     return jsonify({'message':'Detection mode on!!'})
 
-# Shut down the web server if necessary
+# Turn off detection mode
 @app.route('/turn_off_detection', methods=['GET','POST'])
 def turn_off_detection():
+    app.logger.info('turn off detection')
     if ROBOT:
         ROBOT.CAMERA.end_detection()
     return jsonify({'message':'Detection mode off!!'})
@@ -131,15 +163,26 @@ def logout():
     session.clear()
     return redirect('/')
 
-# Shut down the web server if necessary
-@app.route('/shutdown', methods=['GET','POST'])
-def shutdown():
-    print("Shutting Down")
-    ROBOT = None
-    DATABASE = None
+# Shut down the robot
+@app.route('/shutdown_robot', methods=['GET','POST'])
+def shutdown_robot():
+    app.logger.info("Shut down robot")
+    global ROBOT
+    if ROBOT:
+        ROBOT.CAMERA.stop()
+        ROBOT.stop()
+        time.sleep(0.5)
+        ROBOT = None
+    return jsonify({'message':'Shutting Down'})
+
+# Exit the web server
+@app.route('/exit', methods=['GET','POST'])
+def exit():
+    app.logger.info("Exiting")
+    shutdown_robot()
     func = request.environ.get('werkzeug.server.shutdown')
     func()
-    return jsonify({'message':'Shutting Down'})
+    return jsonify({'message':'Exiting'})
 
 #---------------------------------------------------------------------------
 # main method called web server application

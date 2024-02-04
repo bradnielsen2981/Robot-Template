@@ -11,12 +11,13 @@ class Robot(RobotInterface):
         super().__init__()
         self.DATABASE = DATABASE
         self.routine = "Ready" #use this stop or start routines
+        self.logger.info('Beginning Automated Search')
         return
      
     # Write a function for automated search, pickup and putdown, and save instructions to the database
     def automated_search(self):
         self.routine = 'automated_search'
-
+        self.logger.info('Beginning Automated Search')
         return
     
 # Only execute if this is the main file, good for testing code

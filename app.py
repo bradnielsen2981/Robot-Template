@@ -11,20 +11,28 @@ sys.tracebacklimit = 10
 app.config['SECRET_KEY'] = "Type in a secret line of text"
 
 #---EMBED OBJECTS---------------------------------------------------
-DATABASE = Database("database/test.db", app.logger)
+DATABASE = Database("databases/test.db", app.logger)
 ROBOT = None
 
 #---VIEW FUNCTIONS----------------------------------------------------
+# Backdoor
+@app.route('/backdoor')
+def backdoor():
+    if DATABASE:
+        results = DATABASE.ViewQuery("SELECT * FROM users")
+    return jsonify(results)
+
 # Login as the admin user
 @app.route('/', methods=["GET","POST"])
 def login():
+    if 'userid' in session:
+        return redirect('/mission')
     app.logger.info("Login")
     if request.method == "POST":
         email = request.form['email']
         password = request.form['password']
         if email == 'admin@admin' and password == 'admin': 
             session['userid'] = 1
-            time.sleep(3)
             return redirect('./mission') #takes 3 seconds for the CAMERA to start
     return render_template("login.html")
 

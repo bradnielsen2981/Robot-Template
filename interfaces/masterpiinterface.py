@@ -22,7 +22,7 @@ class MasterPiInterface():
         self.status = "Ready"
         self.arm_rotation = 1500 #centre position
         self.camera_pos = "default"
-        self.logger = logging.getLogger('HiwonderInterface')
+        self.logger = logging.getLogger('Robot')
         setup_logger(self.logger, '../logs/robot.log')
         return
     

@@ -35,7 +35,7 @@ def login():
             session['userid'] = 1
             return redirect('./mission') #takes 3 seconds for the CAMERA to start
     return render_template("login.html")
-
+ 
 # Dashboard for the robot
 @app.route('/mission', methods=['GET','POST'])
 def mission():

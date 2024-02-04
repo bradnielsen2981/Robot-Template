@@ -33,7 +33,6 @@ class RobotInterface(MasterPiInterface):
     # Confirmlevel is the number of unique detection types required before a stop.
     def move_direction_until_detection(self, movetype="forward", distanceto=250, detection_types=['sonar'],
                                        detection_colours=['red'], timelimit=5, confirmlevel=1):
-        self.logger.info("move direction until detection")
         self.command = "move_direction_until_detection"
         data = {}
         data['command'] = self.command

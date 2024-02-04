@@ -1,4 +1,4 @@
-/* This is your dashboard javascript, it has been embedded into dashboard.html */
+/* This is your dashboard JavaScript, it has been embedded into dashboard.html */
 
 function hide_dashboard()
 {
@@ -66,55 +66,3 @@ function turn_off_detection()
         new_ajax_helper('/turn_off_detection');
     }
 }
-
-look_down_button.onclick = look_down;
-function look_down()
-{
-    if (robot_loaded == 1)
-    {
-        new_ajax_helper('/look_down');
-    }
-}
-
-look_up_button.onclick = look_up;
-function look_up()
-{
-    if (robot_loaded == 1)
-    {
-        new_ajax_helper('/look_up');
-    }
-}
-
-move_forward_button.onclick = move_forward;
-function move_forward()
-{
-    if (robot_loaded == 1)
-    {
-        new_ajax_helper('/move_forward');
-    }
-}
-
-stop_button.onclick = stop_command;
-function stop_command()
-{
-    if (robot_loaded == 1)
-    {
-        new_ajax_helper('/stop_command');
-    }
-}
-
-move_toward_colour_button.onclick = move_toward_colour;
-function move_toward_colour()
-{
-    if (robot_loaded == 1)
-    {
-        colour = colour_input.value;
-        if (colour != "")
-        {
-            formobject = new FormData(); //create a form object
-            formobject.append("colour", colour); //email is a textinput tag value
-            new_ajax_helper(url='/move_toward_colour', defaulthandler, formobject);
-        }
-    }
-}
-

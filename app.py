@@ -39,9 +39,9 @@ def login():
 # Dashboard for the robot
 @app.route('/mission', methods=['GET','POST'])
 def mission():
-    loaded = 0
     if not 'userid' in session:
         return redirect('/')
+    loaded = 0
     if ROBOT:
         loaded = 1
     return render_template('mission.html', robot_loaded=loaded)
@@ -58,61 +58,10 @@ def load_robot():
 
 # YOUR FLASK CODE------------------------------------------------------------------------
 
-# Manual move forward until stop is pressed
-@app.route('/move_forward', methods=['GET','POST'])
-def move_forward():
-    app.logger.info('move forward')
-    if ROBOT:
-        ROBOT.SOUND.say("Moving forward")
-        try:
-            ROBOT.move_direction_time(power=35, direction=90, timelimit=5)
-        except Exception as e:
-            app.logger.info(e)
-            ROBOT.stop()
-    return jsonify({'message':'moving forward'})
 
-# Manual stop
-@app.route('/stop_command', methods=['GET','POST'])
-def stop():
-    app.logger.info('stop')
-    if ROBOT:
-        ROBOT.stop()
-        app.logger.info('Stopping')
-        ROBOT.SOUND.say('Stopping')
-    return jsonify({'message':'stopping'})
 
-# Move towards the detected colour
-@app.route('/move_toward_colour', methods=['GET','POST'])
-def move_toward_colour_detected():
-    app.logger.info('move toward colour detected')
-    try:
-        if request.method == "POST":
-            colour = request.form['colour']
-            if ROBOT:
-                ROBOT.SOUND.say("Move toward colour")
-                ROBOT.move_toward_colour_detected(colour=colour)
-    except Exception as e:
-        print(e)
-        ROBOT.stop_command()
-        ROBOT.SOUND.say("Stopping")
-    return jsonify({'message':'move_toward_colour_detected'})
 
-# Look down
-@app.route('/look_down', methods=['GET','POST'])
-def look_down():
-    app.logger.info('look down')
-    if ROBOT:
-        ROBOT.SOUND.say("Look down")
-        ROBOT.look_down()
-    return jsonify({'message':'look down'})
 
-# Look up
-@app.route('/look_up', methods=['GET','POST'])
-def look_up():
-    app.logger.info('look up')
-    if ROBOT:
-        ROBOT.look_up()
-    return jsonify({'message':'look up'})
 
 
 

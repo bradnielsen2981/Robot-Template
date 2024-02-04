@@ -62,7 +62,7 @@ class SoundInterface():
 #only execute if this is the main file, good for testing code.   
 if __name__ == "__main__":
     SOUND = SoundInterface()
-    SOUND.load_mp3("../static/music/missionimpossible.mp3")
+    SOUND.load_mp3("static/music/missionimpossible.mp3")
     SOUND.say("Hello, my name is WALLEE")
     SOUND.play_music(1)
     response = input("Press Enter to stop")

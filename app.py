@@ -44,6 +44,7 @@ def mission():
         return redirect('/')
     if ROBOT:
         loaded = 1
+    flash("FLASH is WORKING")
     return render_template('mission.html', robot_loaded=loaded)
 
 #load the robot

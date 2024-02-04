@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 #container for more advanced functionality
+# use Ctrl + K, Ctrl + 0 to minimise all coding blocks in VSCODE
 import time, sys, os, math, logging
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 

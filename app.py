@@ -55,18 +55,51 @@ def load_robot():
         app.logger.info('Loading Robot')
         ROBOT = Robot(DATABASE)
         time.sleep(3) #takes 3 seconds to load the robot
+        ROBOT.reset_arm()
         ROBOT.SOUND.say("Hello my name is Wally")
     return jsonify({'message':'robot loaded'})
 
 # YOUR FLASK CODE------------------------------------------------------------------------
+# Look Up
+@app.route('/look_down', methods=['GET','POST'])
+def lookup():
+    app.logger.info('Looking Down')
+    if ROBOT:
+        ROBOT.SOUND.say("Look Down")
+        ROBOT.look_down()
+    return jsonify({'message':'look down'})
 
 # Stop
 @app.route('/stop', methods=['GET','POST'])
 def stop():
     app.logger.info('stopping robot')
     if ROBOT:
+        ROBOT.stop_command()
         ROBOT.stop()
     return jsonify({'message':'stop'})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -28,4 +28,4 @@ class Robot(RobotInterface):
 if __name__ == '__main__':
     ROBOT = Robot(None)
     input("Press enter to begin testing:")
-    #ROBOT.SOUND.say("Hello my name is Wally")
+    ROBOT.shutdown()

@@ -69,6 +69,15 @@ function turn_off_detection()
     }
 }
 
+look_down_button.onclick = look_down;
+function look_down()
+{
+    if (robot_loaded == 1)
+    {
+        new_ajax_helper('/look_down');
+    }
+}
+
 
 
 

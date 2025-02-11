@@ -209,8 +209,8 @@ class MasterPiInterface():
 #main execution point for testing purposes
 if __name__ == '__main__':
     ROBOT = MasterPiInterface()
-    
     print("\033c")
+    time.sleep(3)
     v = ROBOT.get_voltage()/1000
     ROBOT.reset_arm()
     print(v)

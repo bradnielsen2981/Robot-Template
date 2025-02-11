@@ -275,7 +275,7 @@ class RobotInterface(MasterPiInterface):
         #if y >= 225:
         if y >= 100:
             deltaY = int((480-y)/240*300)
-            print(deltaY)
+            #print(deltaY)
             self.grab_with_current_arm_rotation(deltaY)
             self.reset_arm()
             data['pickup'] = True
@@ -433,8 +433,8 @@ class RobotInterface(MasterPiInterface):
 
 # TEST ROBOT CODE
 if __name__ == '__main__':
-    print("\033c")
     ROBOT = RobotInterface()
+    print("\033c")
     input("Press Enter to Start")
     ROBOT.CAMERA.create_detection_window()
     ROBOT.show_camera = True #show camera window must be inside each loop
@@ -442,9 +442,19 @@ if __name__ == '__main__':
     ROBOT.stop()
     print("Voltage: ",ROBOT.get_voltage())
     ROBOT.look_up()
-    ROBOT.move_toward_colour_detected(colour="red", timelimit=5, mode='turning')
+    ROBOT.auto_detection(timelimit=5)
+    ROBOT.SOUND.say("Robot ready")
+    ROBOT.move_direction_until_detection(movetype="forward", distanceto=250, detection_types=['colour'],
+                                       detection_colours=['blue'])
+    time.sleep(1)
+    ROBOT.move_toward_colour_detected(colour="blue", timelimit=5, mode='turning')
+    time.sleep(1)
+    temp = ROBOT.get_infra_object()
+    print("TEMP", temp)
     ROBOT.look_down()
-    ROBOT.move_toward_colour_detected(colour="red", timelimit=5, mode='turning')
+    time.sleep(1)
+    ROBOT.move_toward_colour_detected(colour="blue", timelimit=5, mode='turning')
+    time.sleep(1)
     data = ROBOT.rotate_arm_until_colour_detected_is_centered("red",timelimit=5)
     ROBOT.pick_up_centered_object_with_look_down(data['y'])
     #ROBOT.SOUND.say("Move until detection")

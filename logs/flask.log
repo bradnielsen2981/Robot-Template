@@ -209,3 +209,125 @@ INFO:werkzeug:192.168.20.3 - - [04/Feb/2025 22:49:32] "[97mPOST /load_robot HTT
 INFO:werkzeug:192.168.20.3 - - [04/Feb/2025 22:49:32] "[97mGET /videofeed HTTP/1.1[0m" 200 -
 INFO:flask.app:Shutting down robot
 INFO:werkzeug:192.168.20.3 - - [04/Feb/2025 22:49:42] "[97mPOST /shutdown_robot HTTP/1.1[0m" 200 -
+INFO:werkzeug: * Running on http://0.0.0.0:5000/ (Press CTRL+C to quit)
+INFO:werkzeug: * Restarting with stat
+WARNING:werkzeug: * Debugger is active!
+INFO:werkzeug: * Debugger PIN: 996-035-636
+INFO:flask.app:Login
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:37:17] "[97mGET / HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:37:17] "[97mGET /static/css/custom.css HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:37:17] "[97mGET /static/js/new_ajax_helper.js HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:37:17] "[97mGET /static/js/general.js HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:37:17] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+INFO:flask.app:Login
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:37:34] "[32mPOST / HTTP/1.1[0m" 302 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:37:34] "[97mGET /mission HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:37:34] "[97mGET /static/js/mission.js HTTP/1.1[0m" 200 -
+INFO:flask.app:Loading Robot
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:37:48] "[97mPOST /load_robot HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:37:48] "[97mGET /videofeed HTTP/1.1[0m" 200 -
+INFO:flask.app:turn on detection
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:37:53] "[97mPOST /turn_on_detection HTTP/1.1[0m" 200 -
+INFO:flask.app:turn off detection
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:38:24] "[97mPOST /turn_off_detection HTTP/1.1[0m" 200 -
+INFO:flask.app:Looking Up
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:38:28] "[1m[35mPOST /lookup HTTP/1.1[0m" 500 -
+INFO:werkzeug: * Detected change in '/home/pi/Desktop/RobotTemplate/app.py', reloading
+INFO:werkzeug: * Restarting with stat
+INFO:werkzeug: * Running on http://0.0.0.0:5000/ (Press CTRL+C to quit)
+INFO:werkzeug: * Restarting with stat
+WARNING:werkzeug: * Debugger is active!
+INFO:werkzeug: * Debugger PIN: 996-035-636
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:39:47] "[97mGET /mission HTTP/1.1[0m" 200 -
+INFO:flask.app:Loading Robot
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:39:57] "[97mPOST /load_robot HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:39:57] "[97mGET /videofeed HTTP/1.1[0m" 200 -
+INFO:flask.app:turn on detection
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:40:02] "[97mPOST /turn_on_detection HTTP/1.1[0m" 200 -
+INFO:flask.app:turn off detection
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:40:05] "[97mPOST /turn_off_detection HTTP/1.1[0m" 200 -
+INFO:flask.app:Looking Up
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:40:09] "[97mPOST /lookup HTTP/1.1[0m" 200 -
+INFO:flask.app:Shutting down robot
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:40:27] "[97mPOST /shutdown_robot HTTP/1.1[0m" 200 -
+INFO:werkzeug: * Running on http://0.0.0.0:5000/ (Press CTRL+C to quit)
+INFO:werkzeug: * Restarting with stat
+WARNING:werkzeug: * Debugger is active!
+INFO:werkzeug: * Debugger PIN: 996-035-636
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:43:28] "[97mGET /mission HTTP/1.1[0m" 200 -
+INFO:flask.app:Loading Robot
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:43:38] "[97mPOST /load_robot HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:43:38] "[97mGET /videofeed HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:43:54] "[97mGET /mission HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:43:54] "[97mGET /static/js/general.js HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:43:54] "[97mGET /static/css/custom.css HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:43:54] "[97mGET /static/js/mission.js HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:43:54] "[97mGET /static/js/new_ajax_helper.js HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:43:55] "[97mGET /videofeed HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:43:55] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+INFO:flask.app:Shutting down robot
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:43:59] "[97mGET /mission HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:43:59] "[97mGET /static/css/custom.css HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:43:59] "[97mGET /static/js/new_ajax_helper.js HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:43:59] "[97mGET /static/js/general.js HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:43:59] "[97mGET /static/js/mission.js HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:43:59] "[97mGET /videofeed HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:43:59] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+INFO:flask.app:Shutting down robot
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:44:02] "[97mPOST /shutdown_robot HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:44:04] "[1m[35mPOST /shutdown_robot HTTP/1.1[0m" 500 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:44:05] "[97mGET /mission HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:44:06] "[97mGET /static/css/custom.css HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:44:06] "[97mGET /static/js/new_ajax_helper.js HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:44:06] "[97mGET /static/js/general.js HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:44:06] "[97mGET /static/js/mission.js HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:44:06] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:44:06] "[97mGET /mission HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:44:06] "[97mGET /static/css/custom.css HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:44:06] "[97mGET /static/js/new_ajax_helper.js HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:44:06] "[97mGET /static/js/general.js HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:44:06] "[97mGET /static/js/mission.js HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:44:07] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+INFO:flask.app:Loading Robot
+INFO:werkzeug: * Running on http://0.0.0.0:5000/ (Press CTRL+C to quit)
+INFO:werkzeug: * Restarting with stat
+WARNING:werkzeug: * Debugger is active!
+INFO:werkzeug: * Debugger PIN: 996-035-636
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:50:36] "[32mGET / HTTP/1.1[0m" 302 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:50:36] "[97mGET /mission HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:50:57] "[97mGET /mission HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:51:01] "[97mGET /mission HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:51:01] "[97mGET /static/css/custom.css HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:51:01] "[97mGET /static/js/new_ajax_helper.js HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:51:01] "[97mGET /static/js/general.js HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:51:01] "[97mGET /static/js/mission.js HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:51:01] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+INFO:flask.app:Loading Robot
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:51:13] "[97mPOST /load_robot HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:51:13] "[97mGET /videofeed HTTP/1.1[0m" 200 -
+INFO:flask.app:Looking Down
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:51:20] "[97mPOST /look_down HTTP/1.1[0m" 200 -
+INFO:werkzeug: * Detected change in '/home/pi/Desktop/RobotTemplate/app.py', reloading
+INFO:werkzeug: * Restarting with stat
+INFO:werkzeug: * Running on http://0.0.0.0:5000/ (Press CTRL+C to quit)
+INFO:werkzeug: * Restarting with stat
+WARNING:werkzeug: * Debugger is active!
+INFO:werkzeug: * Debugger PIN: 996-035-636
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:52:24] "[97mGET /mission HTTP/1.1[0m" 200 -
+INFO:flask.app:Loading Robot
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:52:33] "[97mPOST /load_robot HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:52:33] "[97mGET /videofeed HTTP/1.1[0m" 200 -
+INFO:flask.app:Looking Down
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:52:39] "[97mPOST /look_down HTTP/1.1[0m" 200 -
+INFO:flask.app:Shutting down robot
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:52:49] "[97mPOST /shutdown_robot HTTP/1.1[0m" 200 -
+INFO:flask.app:Loading Robot
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:53:00] "[97mPOST /load_robot HTTP/1.1[0m" 200 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:53:00] "[97mGET /videofeed HTTP/1.1[0m" 200 -
+INFO:flask.app:turn on detection
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:53:05] "[97mPOST /turn_on_detection HTTP/1.1[0m" 200 -
+INFO:flask.app:turn off detection
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:53:19] "[97mPOST /turn_off_detection HTTP/1.1[0m" 200 -
+INFO:flask.app:Shutting down robot
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:53:25] "[33mGET /maintenance HTTP/1.1[0m" 404 -
+INFO:werkzeug:192.168.20.11 - - [11/Feb/2025 21:53:26] "[97mPOST /shutdown_robot HTTP/1.1[0m" 200 -

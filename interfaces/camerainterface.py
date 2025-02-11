@@ -11,6 +11,22 @@ import numpy as np
 import yaml_handle #lab colours
 from loggerinterface import setup_logger
 import logging
+try:
+    import pytesseract #text detection
+    LETTERDETECTION_ENABLED = True
+except:
+    print("pytesseract not installed. Letter detection disabled")
+    LETTERDETECTION_ENABLED = False
+try:
+    from pycoral.utils.dataset import read_label_file
+    from pycoral.utils.edgetpu import make_interpreter
+    from pycoral.adapters import common
+    from pycoral.adapters import classify
+    from pycoral.utils.edgetpu import list_edge_tpus
+    MODELDETECTION_ENABLED = True
+except:
+    print("pycoral not installed. Model detection disabled.")
+    MODELDETECTION_ENABLED = False
 #from keras.models import load_model 
 
 #helper function for detecting contours
@@ -52,11 +68,13 @@ class CameraInterface():
         self.detection_data = { } #detection dictionary will contain the name of the task and data that was detected
         self.detection_tasks = []
         self.detection_colours = []
+        self.model_interpreter = None
         self.detection_model = None
         self.detection_model_class_names = None
         self.colour_shift = 0 #if more than one colour, colour will shift each frame
         self.task_shift = 0 #if more than one task, the task will shift each frame
         self.linecolour = "black"
+        self.lettercolour = "green"
         self.min_detection_area = 800
         self.detection_data_expire_time = 1
         self.clear_temp_detection_data = False
@@ -202,7 +220,7 @@ class CameraInterface():
                             if 'detect_letter' not in detection_data:
                                 detection_data['detect_letter'] = {}
 
-                            frame, data = self.detect_letter(currenttime, frame)
+                            frame, data = self.detect_letter(currenttime, frame, colour=self.lettercolour)
                             if data['found']:
                                 detection_data['detect_letter'] = data.copy()
                             else:
@@ -341,15 +359,26 @@ class CameraInterface():
         return frame, data
     
     # Detect a Letter 
-    def detect_letter(self, currenttime, frame):
+    def detect_letter(self, currenttime, frame, colour="None"):
 
         #TO DO - NOT CURRENTLY WORKING - WAY TOO SLOW - EXIT - MIGHT BE FASTER WITH CORAL
         data = { 'found':None }
-        return frame, data
+        if LETTERDETECTION_ENABLED == False: 
+            return frame, data
+
+        if colour is not None:
+            if colour in self.lab_colours:
+                minC = np.array(self.lab_colours[colour]['min'])  # Min color range
+                maxC = np.array(self.lab_colours[colour]['max'])  # Max color range
+                frame_lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
+                frame_mask = cv2.inRange(frame_lab, minC, maxC)  # Corrected reference
+            else:
+                frame_mask = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        else:
+            frame_mask = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     
         # Preprocess the image
-        gray_image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        threshold_image = cv2.threshold(gray_image, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+        threshold_image = cv2.threshold(frame_mask, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
 
         # Detect contours
         contours, _ = cv2.findContours(threshold_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -370,9 +399,10 @@ class CameraInterface():
             # Extract ROI
             roi = threshold_image[y:y+h, x:x+w]
 
-            # Use Tesseract to recognize text - hangs????
-            text = pytesseract.image_to_string(roi, config='--psm 6 -l eng')
-            print(data)
+            # Use Tesseract to recognize text - hangs???? change to pip install easyocr
+            text = pytesseract.image_to_string(roi, config='--psm 8 -l eng')
+            print(text.encode('utf-8').decode('utf-8'))
+            #print(data)
             '''
             if text != "":
                 if self.drawing:
@@ -387,30 +417,19 @@ class CameraInterface():
     
         #TO DO - NOT CURRENTLY WORKING- EXIT
         data = { 'found':None }
-        return frame, data
+        if MODELDETECTION_ENABLED == False: 
+            return frame, data
 
         if self.detection_model == None:
             return frame, data
 
-        # Resize the raw image into (224-height,224-width) pixels
-        image = cv2.resize(frame, (224, 224), interpolation=cv2.INTER_AREA)
-        # Make the image a numpy array and reshape it to the models input shape.
-        image = np.asarray(image, dtype=np.float32).reshape(1, 224, 224, 3)
-        # Normalize the image array
-        image = (image / 127.5) - 1
+        size = common.input_size(self.model_interpreter)
+        common.set_input(self.model_interpreter, cv2.resize(frame, size, fx=0, fy=0,
+                                                interpolation=cv2.INTER_CUBIC))
+        self.model_interpreter.invoke()
+        prediction = classify.get_classes(self.model_interpreter)
 
-        # Predicts the model
-        prediction = model.predict(image)
-        index = np.argmax(prediction)
-        class_name = self.detection_model_class_names[index]
-        confidence_score = prediction[0][index]
-
-        # Print prediction and confidence score
-        prediction = class_name[:1]
-        confidence = np.round(confidence_score*100)[:-2]
-
-        if confidence_score > 75:
-            data = { 'found':True, 'prediction':prediction, 'time':currenttime }  
+        data = { 'found':True, 'prediction':prediction, 'time':currenttime }  
 
         return frame, data
 
@@ -450,24 +469,7 @@ class CameraInterface():
     def add_detection_task(self, task):
         with self.task_lock:
             if task not in self.detection_tasks:
-                if task == 'detect_letter':
-                    try:
-                        import pytesseract #text detection
-                        self.detection_tasks.append(task)
-                    except:
-                        print("Libraries not installed")
-                elif task == 'detect_model':
-                    try:
-                        from pycoral.utils.dataset import read_label_file
-                        from pycoral.utils.edgetpu import make_interpreter
-                        from pycoral.adapters import common
-                        from pycoral.adapters import classify
-                        from pycoral.utils.edgetpu import list_edge_tpus
-                        self.detection_tasks.append(task)
-                    except:
-                        print("Libraries not installed")
-                else:
-                    self.detection_tasks.append(task)
+                self.detection_tasks.append(task)
         return
     
     # set the detection tasks to be a list
@@ -554,8 +556,9 @@ class CameraInterface():
     
     # Load the detection model
     def load_detection_model(self, model_file, classes_file):
-        self.detection_model = load_model(model_file, compile=False)
-        self.detection_model_class_names = open(classes_file, "r").readlines()
+        self.model_interpreter = make_interpreter(model_file)
+        self.model_interpreter.allocate_tensors()
+        self.detection_model_class_names = read_label_file(classes_file)
         return
     
     # Clear the detection model

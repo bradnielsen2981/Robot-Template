@@ -10,17 +10,22 @@ class Robot(RobotInterface):
     def __init__(self, DATABASE):
         super().__init__()
         self.DATABASE = DATABASE
-        self.routine = "Ready" #use this stop or start routines
+        self.routine = "ready" #use this stop or start routines
         return
      
-    # Write a function for automated search, pickup and putdown, and save instructions to the database
-    def automated_search(self):
+    # Write a function for automated search
+    def automated_search(self, timelimit=300):
         self.routine = 'automated_search'
         self.logger.info('Beginning Automated Search')
+        return
+    
+    def stop_automated_search(self):
+        self.routine = "ready"
+        self.logger.info('Stop Automated Search')
         return
     
 # Only execute if this is the main file, good for testing code
 if __name__ == '__main__':
     ROBOT = Robot(None)
     input("Press enter to begin testing:")
-    ROBOT.automated_search()
+    #ROBOT.SOUND.say("Hello my name is Wally")

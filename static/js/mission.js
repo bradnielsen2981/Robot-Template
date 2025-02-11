@@ -5,7 +5,8 @@ function hide_dashboard()
     videofeed.innerHTML = ' ';
     load_robot_button.style.display = "block";
     robot_buttons.style.display = "none";
-    shutdown_robot_button.style.display = "none"
+    shutdown_robot_button.style.display = "none";
+    mission_tab.style.display = "none";
 }
 function show_dashboard()
 {
@@ -14,6 +15,7 @@ function show_dashboard()
     robot_buttons.style.display = "block";
     shutdown_robot_button.style.display = "block";
     load_robot_button.style.display = "none";
+    mission_tab.style.display = "block";
 }
 
 load_robot_button.onclick = load_robot;
@@ -23,7 +25,7 @@ function load_robot()
     {
         load_robot_button.style.display = 'none';
         loader.style.display = 'block';
-        new_ajax_helper('/load_robot', defaulthandler=load_robot_handler);
+        new_ajax_helper('/load_robot', load_robot_handler);
     }
 }
 function load_robot_handler(response) { show_dashboard(); robot_loaded = 1; }
@@ -34,7 +36,7 @@ function shutdown_robot()
     if (robot_loaded == 1)
     {
         hide_dashboard();
-        new_ajax_helper('/shutdown_robot', defaulthandler=shutdown_robot_handler);
+        new_ajax_helper('/shutdown_robot', shutdown_robot_handler);
     }
 }
 function shutdown_robot_handler(response)
@@ -66,3 +68,7 @@ function turn_off_detection()
         new_ajax_helper('/turn_off_detection');
     }
 }
+
+
+
+

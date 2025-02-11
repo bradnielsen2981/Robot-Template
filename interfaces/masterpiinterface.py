@@ -3,7 +3,7 @@
 import sys, os, cv2, time, queue, logging, threading, math, logging
 sys.path.append('/home/pi/MasterPi')
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
-
+import MLX90614
 import numpy as np
 import HiwonderSDK.Sonar as sonar
 import HiwonderSDK.mecanum as mecanum
@@ -19,6 +19,8 @@ class MasterPiInterface():
         self.sonar = sonar.Sonar()
         self.sonar.setRGBMode(0)
         self.chassis = mecanum.MecanumChassis()
+        self.infrared = MLX90614.MLX90614()
+        time.sleep(0.5)
         self.status = "Ready"
         self.arm_rotation = 1500 #centre position
         self.camera_pos = "default"
@@ -40,6 +42,14 @@ class MasterPiInterface():
         distance = self.sonar.getDistance()
         time.sleep(0.1)
         return distance
+    
+    #get infrared ambient
+    def get_infra_ambient(self):
+        return round(self.infrared.get_amb_temp(),2)
+    
+    #get infrared object
+    def get_infra_object(self):
+        return round(self.infrared.get_obj_temp(),2)
 
     #set sonar eye color
     def set_sonarLED_colortuple(self, rgbtuple=(255,0,0)):
@@ -133,6 +143,10 @@ class MasterPiInterface():
         self.camera_pos = "default"
         return
     
+    def get_voltage(self):
+        voltage = Board.getBattery()/1000
+        return voltage
+    
     #reset the arm
     def look_down(self):
         actiongroup.runAction("lookdown")
@@ -195,7 +209,42 @@ class MasterPiInterface():
 #main execution point for testing purposes
 if __name__ == '__main__':
     ROBOT = MasterPiInterface()
+    
+    print("\033c")
+    v = ROBOT.get_voltage()/1000
+    ROBOT.reset_arm()
+    print(v)
+    '''
+    
     ROBOT.stop()
-    ROBOT.look_up()
+    input("Buzzer on")
+    ROBOT.set_buzzer_time(1)
+    input("Sonar purple")
+    ROBOT.set_sonarLED_color("purple")
+    input("Board red")
+    ROBOT.set_boardLED_color("red")
+    print("SONAR", ROBOT.get_sonar_distance())
+    print("INFRARED_AMBIENT_TEMP", ROBOT.get_infra_ambient())
+    print("INFRARED OBJECT TIME", ROBOT.get_infra_object())
+    ROBOT.look_down()
+    input("Move forward press enter")
+    ROBOT.move_direction_time(timelimit=2)
+    input("Move left press enter")
+    ROBOT.move_direction_time(power=35, direction=0, rotationspeed=0, timelimit=2)
+    input("Move right press enter")
+    ROBOT.move_direction_time(power=35, direction=180, rotationspeed=0, timelimit=2)
+    input("Move back press enter")
+    ROBOT.move_direction_time(power=35, direction=270, rotationspeed=0, timelimit=2)
+    input("Rotate left - press enter")
+    ROBOT.rotate_speed_time(rotationspeed=-0.1, timelimit=2)
+    input("Rotate right - press enter")
+    ROBOT.rotate_speed_time(rotationspeed=0.1, timelimit=2)
+    input("Robot grab with current arm rotation")
     ROBOT.grab_with_current_arm_rotation()
+    time.sleep(1)
+    ROBOT.reset_arm()
+    ROBOT.set_sonarLED_color("black")
+    ROBOT.set_boardLED_color("black")
+    ROBOT.stop()
+    '''
 

@@ -1,0 +1,2 @@
+2024-02-15 22:24:31,407 - Robot - INFO - Beginning Automated Search
+2024-02-15 22:24:46,927 - Robot - INFO - {'command': 'rotate_arm_until_colour_detected_is_centered', 'starttime': 1707999884.8247764, 'detect_line': {}, 'detect_colour': {'red': {'found': True, 'area': 16930.0, 'rect': ((320.819580078125, 310.53094482421875), (134.73643493652344, 137.57940673828125), -66.03751373291016), 'time': 1707999886.915127}}, 'detect_letter': {}, 'detect_model': {}, 'x': 320.819580078125, 'y': 310.53094482421875, 'endtime': 1707999886.9272094}

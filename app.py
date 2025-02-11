@@ -33,6 +33,7 @@ def login():
         password = request.form['password']
         if email == 'admin@admin' and password == 'admin': 
             session['userid'] = 1
+            session['permission'] = 'admin'
             return redirect('./mission') #takes 3 seconds for the CAMERA to start
     return render_template("login.html")
 
@@ -54,10 +55,18 @@ def load_robot():
         app.logger.info('Loading Robot')
         ROBOT = Robot(DATABASE)
         time.sleep(3) #takes 3 seconds to load the robot
+        ROBOT.SOUND.say("Hello my name is Wally")
     return jsonify({'message':'robot loaded'})
 
 # YOUR FLASK CODE------------------------------------------------------------------------
 
+# Stop
+@app.route('/stop', methods=['GET','POST'])
+def stop():
+    app.logger.info('stopping robot')
+    if ROBOT:
+        ROBOT.stop()
+    return jsonify({'message':'stop'})
 
 
 
@@ -73,6 +82,14 @@ def load_robot():
 
 
 
+
+
+
+
+
+
+
+ 
 # CAMERA CODE-(do not touch!!)-------------------------------------------------------
 # Continually gets the frame from the pi camera
 def videostream():
@@ -102,7 +119,7 @@ def videofeed():
 def turn_on_detection():
     app.logger.info('turn on detection')
     if ROBOT:
-        ROBOT.CAMERA.detect_all(exclude_colours=['black'])
+        ROBOT.CAMERA.detect_all(exclude_colours=['white','black'])
     return jsonify({'message':'Detection mode on!!'})
 
 # Turn off detection mode
@@ -123,12 +140,13 @@ def logout():
 # Shut down the robot
 @app.route('/shutdown_robot', methods=['GET','POST'])
 def shutdown_robot():
-    app.logger.info("Shut down robot")
+    app.logger.info("Shutting down robot")
     global ROBOT
     if ROBOT:
         ROBOT.CAMERA.stop()
         ROBOT.stop()
         time.sleep(0.5)
+        ROBOT.SOUND.say("Goodbye")
         ROBOT = None
     return jsonify({'message':'Shutting Down'})
 

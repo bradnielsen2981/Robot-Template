@@ -11,6 +11,7 @@ import numpy as np
 import yaml_handle #lab colours
 from loggerinterface import setup_logger
 import logging
+#from keras.models import load_model 
 
 #helper function for detecting contours
 def get_max_contour(contours, min_area=400):
@@ -25,7 +26,7 @@ def get_max_contour(contours, min_area=400):
                 area_max_contour = c
     return area_max_contour, contour_area_max
 
-# Function to format a dictionary as a string with line breaks
+# Function to format detection dictionary as a string with line breaks
 def format_dict_with_line_breaks(d, indent=0):
     lines = []
     for key, value in d.items():
@@ -40,22 +41,27 @@ def format_dict_with_line_breaks(d, indent=0):
 # The Camera Object
 class CameraInterface():
 
-    #Initialise timelimit and logging
+    # Initialise timelimit and logging
     def __init__(self, timelimit=20, logger=logging.getLogger()):
         self.timelimit=20
         self.logger = logger
         self.thread = None
         self.status = None
         self.frame = None
-        self.detection_data = {'detect_line':{},'detect_colour':{},'detect_letter':{},'detect_model':{}} #detection dictionary will contain the name of the task and data that was detected
+        self.frameskip = 2
+        self.detection_data = { } #detection dictionary will contain the name of the task and data that was detected
         self.detection_tasks = []
         self.detection_colours = []
+        self.detection_model = None
+        self.detection_model_class_names = None
         self.colour_shift = 0 #if more than one colour, colour will shift each frame
         self.task_shift = 0 #if more than one task, the task will shift each frame
-        self.min_detection_area = 300
+        self.linecolour = "black"
+        self.min_detection_area = 800
         self.detection_data_expire_time = 1
         self.clear_temp_detection_data = False
-        self.output_text = False
+        self.output_text = True
+        self.output_message = ""
         self.paused = False
         self.drawing = True
         self.dict_lock = threading.Lock()
@@ -65,6 +71,7 @@ class CameraInterface():
         self.clear_lock = threading.Lock()
         self.logger = logging.getLogger('CameraInterface')
         setup_logger(self.logger, '../logs/camera.log')
+        np.set_printoptions(suppress=True) # Disable scientific notation for clarity
         
         #load the colours for detection - uses the colours set in the yaml
         self.lab_colours = yaml_handle.get_yaml_data(yaml_handle.lab_file_path)
@@ -79,13 +86,15 @@ class CameraInterface():
             self.logger.error("Video capture could not be accessed.")
         return
     
-    def start(self, drawing=True):
+    # Start the camera
+    def start(self):
         if self.status == "Ready":
-            self.drawing = drawing
             self.thread = threading.Thread(target=self.update, args=())
             self.thread.daemon = True
+            self.currenttime = time.time()
             self.thread.start()
             self.status = "Running"
+            
         return
     
     # Function is run by thread...
@@ -93,11 +102,20 @@ class CameraInterface():
         # self.logger.info("Starting Camera Thread")
         img = None
         time.sleep(2) #doesnt work without this, dont know why
+
+        #temp variables
         frame = None
-        detection_data = {'detect_line':{},'detect_colour':{},'detect_letter':{},'detect_model':{}}
+        framecount = 0
+        framerate = 0.0
+        detection_data = {}
+        detection_tasks = None
+        active_detection_task = None
+        colour = None
+
         #to exit the thread, set status to Stopped
         while self.status == "Running":
-            if self.paused:
+
+            if self.paused: #pause the camera update
                 continue
             try:
                 ret, img = self.capture.read()
@@ -108,93 +126,147 @@ class CameraInterface():
             except:
                 continue
             
-            currenttime = time.time()
-            active_detection_task = None
-            colour = None
-            detection_tasks = None
-            
             # clear the temporary detection data when required
-            with self.clear_lock:
-                if self.clear_temp_detection_data == True:
-                    detection_data = {'detect_line':{},'detect_colour':{},'detect_letter':{},'detect_model':{}}
+            if self.clear_temp_detection_data == True:
+                with self.clear_lock:
+                    detection_data.clear()
                     self.colour_shift = 0
                     self.task_shift = 0
                     self.clear_temp_detection_data = False
             
+            #set detection tasks
             with self.task_lock:
                 detection_tasks = self.detection_tasks
-                
-            if len(detection_tasks) > 0:
-                                
-                active_detection_task = detection_tasks[self.task_shift]
-                self.task_shift = (self.task_shift + 1)%len(detection_tasks)
-            
-                if "detect_line" in detection_tasks:
-                    if active_detection_task == None or active_detection_task == 'detect_line': 
-                        frame, line, found = self.detect_line(frame, threshold=100)
-                        if found:
-                            detection_data['detect_line'] = {}
-                            detection_data['detect_line']['found'] = True
-                            detection_data['detect_line']['line'] = line
-                            detection_data['detect_line']['time'] = currenttime
-                        else:
-                            if 'found' in detection_data['detect_line']: #expire old data
-                                if (currenttime - detection_data['detect_line']['time']) > self.detection_data_expire_time:
-                                    detection_data['detect_line'] = {}    
-        
-                if "detect_colour" in detection_tasks:
-                    
-                    if active_detection_task == None or active_detection_task == 'detect_colour':
-                        
-                        if len(self.detection_colours) > 1:
-                            colour = self.detection_colours[self.colour_shift]
-                            self.colour_shift = (self.colour_shift+1)%len(self.detection_colours)
-                            
-                        elif len(self.detection_colours) == 1:
-                            colour = self.detection_colours[0]
-                        else:
-                            self.colour_shift = 0
-                            continue #there are no colours
-                        
-                        if colour in self.lab_colours.keys():
-                            minC = np.array(self.lab_colours[colour]['min']) #min colour range
-                            maxC = np.array(self.lab_colours[colour]['max']) #max colour range
-                            
-                            frame, rect, area, found = self.detect_color(frame, minC, maxC)
-                            if found:
-                                detection_data['detect_colour'][colour] = {}
-                                detection_data['detect_colour'][colour]['found'] = True
-                                detection_data['detect_colour'][colour]['area'] = area
-                                detection_data['detect_colour'][colour]['rect'] = rect #detection data will only exist if colour detected
-                                detection_data['detect_colour'][colour]['time'] = currenttime
-                            else:
-                                if colour in detection_data['detect_colour']:
-                                    if 'found' in detection_data['detect_colour'][colour]:
-                                        if (currenttime - detection_data['detect_colour'][colour]['time']) > self.detection_data_expire_time:
-                                            #print(colour, "data has expired!")
-                                            detection_data['detect_colour'] = {}  
 
-                if "detect_letter" in detection_tasks:
-                    if active_detection_task == None or active_detection_task == 'detect_letter':
-                        pass
+            #FRAME SKIP - only process every second frame
+            framecount+=1
+            if framecount>=self.frameskip:
+                framecount=0
+                
+                #get current time
+                currenttime = time.time()
+
+                if len(detection_tasks) != 0: #there are one or more detection tasks
+                                    
+                    active_detection_task = detection_tasks[self.task_shift] #with more than one detection task
+
+                    if len(detection_tasks) > 0:
+                        self.task_shift = (self.task_shift + 1)%len(detection_tasks)
+                
+                    #check for line detection
+                    if "detect_line" in detection_tasks:
+                        if 'detect_line' not in detection_data:
+                            detection_data['detect_line'] = {}
+
+                        if active_detection_task == None or active_detection_task == 'detect_line': 
+                            frame, data = self.detect_line(currenttime, frame, threshold=100, colour=self.linecolour)
+                            if data['found']:
+                                detection_data['detect_line'] = data.copy()
+                            else: #data['found'] == False
+                                if 'found' in detection_data['detect_line']: #expire old data
+                                    if (currenttime - detection_data['detect_line']['time']) > self.detection_data_expire_time:
+                                        detection_data['detect_line'] = {}  #clear old data  
+            
+                    #check for colour detection
+                    if "detect_colour" in detection_tasks:
+                        if active_detection_task == None or active_detection_task == 'detect_colour':
+                            if 'detect_colour' not in detection_data:
+                                detection_data['detect_colour'] = {}
                             
-                if "detect_model" in detection_tasks: #i could use keras here...
-                    if active_detection_task == None or active_detection_task == 'detect_model':
-                        pass
-                    
-                #write text if output_text is on - update the test every two seconds
-                if self.output_text:
-                    data = None
-                    coord = (10, 10)  # Coordinates of the text
+                            colour = None
+                            if len(self.detection_colours) > 1:
+                                colour = self.detection_colours[self.colour_shift]
+                                self.colour_shift = (self.colour_shift+1)%len(self.detection_colours)
+                                
+                            elif len(self.detection_colours) == 1:
+                                colour = self.detection_colours[0]
+                            else:
+                                self.colour_shift = 0
+                                
+                            if colour != None:
+                                if colour in self.lab_colours.keys():
+                                    minC = np.array(self.lab_colours[colour]['min']) #min colour range
+                                    maxC = np.array(self.lab_colours[colour]['max']) #max colour range
+                                    
+                                    frame, data = self.detect_color(currenttime, frame, minC, maxC)
+                                    if data['found']:
+                                        detection_data['detect_colour'][colour] = data.copy()
+                                    
+                                    if colour in detection_data['detect_colour']:
+                                        if 'found' in detection_data['detect_colour'][colour]:
+                                            if (currenttime - detection_data['detect_colour'][colour]['time']) > self.detection_data_expire_time:
+                                                detection_data['detect_colour'] = {}  #clear old data
+
+                    if "detect_letter" in detection_tasks:
+                        if active_detection_task == None or active_detection_task == 'detect_letter':
+                            if 'detect_letter' not in detection_data:
+                                detection_data['detect_letter'] = {}
+
+                            frame, data = self.detect_letter(currenttime, frame)
+                            if data['found']:
+                                detection_data['detect_letter'] = data.copy()
+                            else:
+                                if 'found' in detection_data['detect_letter']: #expire old data
+                                    if (currenttime - detection_data['detect_letter']['time']) > self.detection_data_expire_time:
+                                        detection_data['detect_model'] = {}  #clear old data  
+                                
+                    if "detect_model" in detection_tasks: #i could use keras here...
+                        if active_detection_task == None or active_detection_task == 'detect_model':
+                            if 'detect_model' not in detection_data:
+                                detection_data['detect_model'] = {}
+
+                            frame, data = self.detect_model(currenttime, frame, self.detection_model)
+                            if data['found']:
+                                detection_data['detect_model'] = data.copy()
+                            else:
+                                if 'found' in detection_data['detect_model']: #expire old data
+                                    if (currenttime - detection_data['detect_model']['time']) > self.detection_data_expire_time:
+                                        detection_data['detect_model'] = {}  #clear old data  
+                        
+                else:
+                    self.task_shift = 0
+                
+                #get current frame rate
+                elapsedtime = currenttime - self.currenttime
+                self.currenttime = currenttime
+                if elapsedtime > 0:
+                    framerate = round(self.frameskip/elapsedtime, 2) #it should be an average framerate 
+                #END FRAME SKIP
+
+            # draw detection lines and boxes
+            if self.drawing:
+                if 'detect_line' in detection_data:
+                    if 'found' in detection_data['detect_line']:
+                        if detection_data['detect_line']['found']:
+                            start_point = detection_data['detect_line']['line'][0]
+                            end_point = detection_data['detect_line']['line'][1]
+                            cv2.line(frame, start_point, end_point, (255, 0, 0), 2)
+
+                if 'detect_colour' in detection_data:
+                    for color, data in detection_data['detect_colour'].items():
+                        if data['found']:
+                            box = cv2.boxPoints(data['rect'])
+                            box = np.int0(box) # Convert to integer type
+                            cv2.drawContours(frame, [box], 0, (0, 255, 0), 2)
+            
+            # Write text if output_text is on - update the test every two seconds
+            if self.output_text:
+                coord = (10, 10)
+                cv2.putText(frame, "Frame rate: " + str(framerate), (coord[0], coord[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,0,255), 1, cv2.LINE_AA)
+                coord = (300, 10)
+                cv2.putText(frame, self.output_message, (coord[0], coord[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,0,255), 1, cv2.LINE_AA)
+                self.output_message = "" #clear the output message
+                coord = (10, 20)
+
+                # If there is current detection - write out the detection data
+                if len(detection_tasks) > 0:
                     formatted_text = format_dict_with_line_breaks(detection_data)
                     lines = formatted_text.split('\n')
                     y_offset = 0
                     for line in lines:
-                        cv2.putText(frame, line, (coord[0], coord[1] + y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,255,255), 1, cv2.LINE_AA)
+                        cv2.putText(frame, line, (coord[0], coord[1] + y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,0,255), 1, cv2.LINE_AA)
                         y_offset += 20  # Adjust the vertical spacing between lines
-            else:
-                self.task_shift = 0
-                
+                    
             with self.frame_lock:
                 self.frame = frame
                 
@@ -203,52 +275,25 @@ class CameraInterface():
                 
         return
     
-    # Detect a contour with colour and return the rectangle of the largest colour
-    def detect_color(self, frame, minC, maxC):
-        frame_lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
-        found = False
-        mask = cv2.inRange(frame_lab, minC, maxC) # Create a mask to isolate the colour regions
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        max_contour, contour_area_max = get_max_contour(contours, self.min_detection_area) #get the largest contour of note and its area
-        target_rect = None; dtime = 0
-        
-        if max_contour is not None: #colour range was found
-            target_rect = cv2.minAreaRect(max_contour) #make an area rectangle around the contour
-            found = True
-            box = cv2.boxPoints(target_rect) # Get the four corner points
-            
-            if self.drawing: # drawing the target on the frame may slow things down
-                box = np.int0(box) # Convert to integer type
-                cv2.drawContours(frame, [box], 0, (0, 255, 0), 3) 
+    # Detect line
+    def detect_line(self, currenttime, frame, threshold=150, colour=None):
 
-        return frame, target_rect, contour_area_max, found
+        data = {'found': False}
+        frame_mask = None
 
-    # TODO: Detect an object based on a model - could use teachable machine to create a model
-    def detect_model(self, frame, model):
-        
-        rect = [0,0,0,0]
-        found = False
-        conclusion = None
+        if colour is not None:
+            if colour in self.lab_colours:
+                minC = np.array(self.lab_colours[colour]['min'])  # Min color range
+                maxC = np.array(self.lab_colours[colour]['max'])  # Max color range
+                frame_lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
+                frame_mask = cv2.inRange(frame_lab, minC, maxC)  # Corrected reference
+            else:
+                frame_mask = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        else:
+            frame_mask = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        return frame, rect, conclusion, found
-
-    # TODO: Detect a Letter 
-    def detect_letter(self, frame):
-        
-        rect = [0,0,0,0]
-        found = False
-        conclusion = None
-
-        return frame, rect, conclusion, found
-
-    # Detect if a black or white line is in range
-    def detect_line(self, frame, threshold=150):
-        longest_line = ((0,0),(0,0)); dtime = 0
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        found = False
-        #blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-        #edges = cv2.Canny(blurred, 50, 150)
-        edges = cv2.Canny(gray, 50, 150, apertureSize=3)
+        edges = cv2.Canny(frame_mask, 50, 150, apertureSize=3)
+        # Use probabilistic Hough Transform for efficiency
         lines = cv2.HoughLines(edges, 1, np.pi/180, threshold=threshold)
 
         if lines is not None:
@@ -276,12 +321,99 @@ class CameraInterface():
                     longest_line = ((x1, y1), (x2, y2))
 
             if longest_line:
-                if self.drawing:
-                    cv2.line(frame, longest_line[0], longest_line[1], (255, 0, 0), 2)
-                found = True
-                
-        return frame, longest_line, found
+                data = {'found':True,'line':longest_line,'time':currenttime }
+
+        return frame, data
     
+    # Detect a contour with colour and return the rectangle of the largest colour
+    def detect_color(self, currenttime, frame, minC, maxC):
+        
+        frame_lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
+        mask = cv2.inRange(frame_lab, minC, maxC) # Create a mask to isolate the colour regions
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        max_contour, contour_area_max = get_max_contour(contours, self.min_detection_area) #get the largest contour of note and its area
+        data = { 'found':False }
+        
+        if max_contour is not None: #colour range was found
+            target_rect = cv2.minAreaRect(max_contour) #make an area rectangle around the contour
+            data = { 'found':True, 'area':contour_area_max, 'rect':target_rect, 'time':currenttime }
+
+        return frame, data
+    
+    # Detect a Letter 
+    def detect_letter(self, currenttime, frame):
+
+        #TO DO - NOT CURRENTLY WORKING - WAY TOO SLOW - EXIT - MIGHT BE FASTER WITH CORAL
+        data = { 'found':None }
+        return frame, data
+    
+        # Preprocess the image
+        gray_image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        threshold_image = cv2.threshold(gray_image, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+
+        # Detect contours
+        contours, _ = cv2.findContours(threshold_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # Iterate through contours
+        for contour in contours:
+            # Calculate contour area
+            area = cv2.contourArea(contour)
+            
+            # Ignore contours smaller than a minimum area
+            if area < self.min_detection_area:
+                continue
+            
+            # Get bounding box
+            x, y, w, h = cv2.boundingRect(contour)
+            target_rect = (x, y, w, h)  # Assign directly to target_rect
+
+            # Extract ROI
+            roi = threshold_image[y:y+h, x:x+w]
+
+            # Use Tesseract to recognize text - hangs????
+            text = pytesseract.image_to_string(roi, config='--psm 6 -l eng')
+            print(data)
+            '''
+            if text != "":
+                if self.drawing:
+                    # Draw a rectangle around the letter
+                    cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+                data = {'found': True, 'text': text, 'rect': target_rect, 'time': currenttime}
+            '''
+        return frame, data
+
+    # Detect an object based on a model - could use teachable machine to create a model
+    def detect_model(self, currenttime, frame, model):
+    
+        #TO DO - NOT CURRENTLY WORKING- EXIT
+        data = { 'found':None }
+        return frame, data
+
+        if self.detection_model == None:
+            return frame, data
+
+        # Resize the raw image into (224-height,224-width) pixels
+        image = cv2.resize(frame, (224, 224), interpolation=cv2.INTER_AREA)
+        # Make the image a numpy array and reshape it to the models input shape.
+        image = np.asarray(image, dtype=np.float32).reshape(1, 224, 224, 3)
+        # Normalize the image array
+        image = (image / 127.5) - 1
+
+        # Predicts the model
+        prediction = model.predict(image)
+        index = np.argmax(prediction)
+        class_name = self.detection_model_class_names[index]
+        confidence_score = prediction[0][index]
+
+        # Print prediction and confidence score
+        prediction = class_name[:1]
+        confidence = np.round(confidence_score*100)[:-2]
+
+        if confidence_score > 75:
+            data = { 'found':True, 'prediction':prediction, 'time':currenttime }  
+
+        return frame, data
+
     # Get current rendered frame
     def get_frame(self):
         with self.frame_lock:
@@ -301,7 +433,7 @@ class CameraInterface():
             cv2.imwrite('frame.jpg', self.frame)
         return
             
-    # Get current rendered frame
+    # Get current detection data
     def get_detection_data(self):
         with self.dict_lock:
             return self.detection_data.copy()
@@ -309,7 +441,7 @@ class CameraInterface():
     # Clear detection data
     def clear_detection_data(self):
         with self.dict_lock:
-            self.detection_data = {'detect_line':{},'detect_colour':{},'detect_letter':{},'detect_model':{}}
+            self.detection_data.clear()
         with self.clear_lock:
             self.clear_temp_detection_data = True #clear temporary detection data
         return
@@ -318,23 +450,46 @@ class CameraInterface():
     def add_detection_task(self, task):
         with self.task_lock:
             if task not in self.detection_tasks:
-                self.detection_tasks.append(task)
+                if task == 'detect_letter':
+                    try:
+                        import pytesseract #text detection
+                        self.detection_tasks.append(task)
+                    except:
+                        print("Libraries not installed")
+                elif task == 'detect_model':
+                    try:
+                        from pycoral.utils.dataset import read_label_file
+                        from pycoral.utils.edgetpu import make_interpreter
+                        from pycoral.adapters import common
+                        from pycoral.adapters import classify
+                        from pycoral.utils.edgetpu import list_edge_tpus
+                        self.detection_tasks.append(task)
+                    except:
+                        print("Libraries not installed")
+                else:
+                    self.detection_tasks.append(task)
         return
     
     # set the detection tasks to be a list
     def set_detection_tasks(self, tasks=[]):
-        with self.task_lock:
-            self.detection_tasks = tasks
+        for task in tasks:
+            self.add_detection_task(task)
         return
     
+    # clear the detection tasks
     def clear_detection_tasks(self):
         with self.task_lock:
-            self.detection_tasks.clear()    
+            self.detection_tasks.clear()
+        return
     
     # Tests all detection tasks
     def detect_all(self, exclude_colours=[]):
-        for key in self.detection_data.keys():
-            self.add_detection_task(key)
+        self.add_detection_task('detect_colour')
+        self.add_detection_task('detect_line')
+        #self.add_detection_task('detect_letter')
+        #self.add_detection_task('detect_model')
+        
+        # DETECT ALL COLOURS WITH A COLOUR SHIFT
         with self.colours_lock:
             self.detection_colours = list(self.lab_colours.keys())
             for colour in exclude_colours:
@@ -349,6 +504,11 @@ class CameraInterface():
     # turn off output text
     def turn_off_output_text(self):
         self.output_text = False
+        return
+    
+    #set an extra output message - can be used for other sensors e.g. voltage, sonar, temperature
+    def set_output_message(self, message):
+        self.output_message = message
         return
     
     # remove a specific detection task
@@ -374,19 +534,37 @@ class CameraInterface():
         self.drawing = False
         return
     
-    # Set the detection colour - the colour name should have been set using the ARM application
+    # Add the detection colour - the colour name should have been set using the ARM application
     def add_detection_colour(self, colour):
         with self.colours_lock:
             if colour not in self.detection_colours:
                 self.detection_colours.append(colour)
         return
     
+    # Set the detection colours as a list
     def set_detection_colours(self, colourlist):
         with self.colours_lock:
             self.detection_colours = colourlist
         return
     
-    # remove detection colours
+    #set the line detection colour
+    def set_line_detection_colour(self, colour):
+        self.linecolour = "colour"
+        return
+    
+    # Load the detection model
+    def load_detection_model(self, model_file, classes_file):
+        self.detection_model = load_model(model_file, compile=False)
+        self.detection_model_class_names = open(classes_file, "r").readlines()
+        return
+    
+    # Clear the detection model
+    def clear_detection_model(self, model):
+        self.detection_model = None
+        self.detection_model_class_names = None
+        return
+    
+    # Remove detection colours
     def remove_detection_colour(self, colour):
         with self.colours_lock:
             self.detection_colours.remove(colour)
@@ -396,6 +574,12 @@ class CameraInterface():
     def clear_detection_colours(self):
         with self.colours_lock:
             self.detection_colours.clear()
+        return
+    
+    #creates the detection window
+    def create_detection_window(self):
+        cv2.namedWindow('Detection Mode')
+        cv2.resizeWindow('Detection Mode', 640, 480)
         return
     
     # Stop the camera thread
@@ -422,13 +606,11 @@ class CameraInterface():
 if __name__ == '__main__':
     input("Please press enter to begin: ")
     CAMERA = CameraInterface()
+    print("\033c")
     CAMERA.start()
-    CAMERA.detect_all()
-    CAMERA.turn_on_output_text()
-    CAMERA.turn_on_drawing()
-    cv2.namedWindow('Detection Mode')
-    cv2.resizeWindow('Detection Mode', 640, 480)
-    time.sleep(3)
+    CAMERA.add_detection_task('detect_colour')
+    CAMERA.add_detection_colour('green')
+    CAMERA.create_detection_window()
     while True:
         frame = CAMERA.get_frame()
         time.sleep(0.01)

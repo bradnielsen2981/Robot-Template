@@ -23,6 +23,20 @@ input#colour_input { width:300px; }
     max-width:640px;
 }
 
+.mission
+{
+    padding:20px;
+    background:#ea39b824;
+    border:1px solid black;
+}
+
+
+
+
+
+
+
+
 /*LOADING BAR
 /* HTML: <div class="loader"></div> */
 .loader {

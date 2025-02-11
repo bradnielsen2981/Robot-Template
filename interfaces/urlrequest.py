@@ -1,6 +1,7 @@
 import urllib.parse
 import urllib.request
 import time
+import torch
 
 #---EXTERNAL URL REQUEST LIBRARY---------------------------------------#
 def sendurlrequest(url, dictofvalues):

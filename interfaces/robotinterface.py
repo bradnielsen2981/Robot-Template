@@ -29,6 +29,63 @@ class RobotInterface(MasterPiInterface):
         self.stop()
         return
 
+    # Moves towards an object in camera view
+    def move_toward_colour_detected(self, colour="red", timelimit=5, mode='turning'):
+        
+        self.command = "move_toward_colour_detected"
+        data = {}
+        data['command'] = self.command
+        data['starttime'] = time.time()
+        self.set_boardLED_color(colour)
+        self.CAMERA.add_detection_task("detect_colour")
+        self.CAMERA.add_detection_colour(colour)
+        self.set_boardLED_color(colour)
+        endtime = time.time() + timelimit
+        centered = False
+        
+        distance = 145
+        if self.camera_pos == "lookdown":
+            distance = 250
+        elif self.camera_pos == "lookup":
+            distance = 90
+        elif self.camera_pos == "default":
+            distance = 145    
+            
+        while ((time.time() < endtime) and (self.command == "move_toward_colour_detected")):
+            if not self.show_camera_window():
+                break
+            
+            temp_data = self.CAMERA.get_detection_data()
+            data.update(temp_data)
+            #time.sleep(0.05)
+            
+            if 'detect_colour' in data:
+                if colour in data['detect_colour']:
+                    if 'found' in data['detect_colour'][colour]:
+                        rect = data['detect_colour'][colour]['rect']
+                        center, size, angle = rect
+                        x, y = center
+                        deltaY = 480-y
+                        deltaX = 320-x
+                        theta_degrees = int(math.degrees(math.atan2(deltaX,deltaY)) + 90)
+                        
+                        if deltaY > distance:
+                            if mode == 'drifting':
+                                self.move_direction(power=33, direction=theta_degrees, rotationspeed=0)
+                            elif mode == 'turning':
+                                turn = round(math.radians(theta_degrees-90)/8, 2)
+                                if abs(turn) <= 0.01:
+                                    turn = 0
+                                self.move_direction(power=33, direction=90, rotationspeed=-turn)
+                        else:
+                            self.move_direction_time(direction=270, rotationspeed=0, power=33, timelimit=0.2)
+                            break
+                
+        self.stop_command()        
+        self.CAMERA.end_detection()
+        data['endtime'] = time.time()
+        return data
+
     # Move in direction until distance from detection. Movetypes can be none, forward, turn, circle, slideright, slideleft 
     # Multiple detection types can be included: sonar, line, colour, model, all. (Model has not been implemented)
     # Confirmlevel is the number of unique detection types required before a stop. Colours can count as more than.
@@ -51,6 +108,7 @@ class RobotInterface(MasterPiInterface):
                 self.CAMERA.set_detection_colours(detection_colours)
                 
             if 'model' in detection_types: #TODO: add detect_model to camera
+                self.CAMERA.load_detection_model()
                 self.CAMERA.add_detection_task("detect_model")
           
         time.sleep(1) #camera needs time to get ready..
@@ -149,7 +207,6 @@ class RobotInterface(MasterPiInterface):
             if 'model' in detection_types or 'all' in detection_types: 
                 pass # Detect_model has not been implemented in the CameraInterface
         
-            self.CAMERA.set_output_message(output_message)
                
         self.stop_command()
         self.CAMERA.end_detection()
@@ -163,7 +220,7 @@ class RobotInterface(MasterPiInterface):
         data = {}
         data['command'] = self.command
         data['starttime'] = time.time()
-        self.rotate_arm_to_left_extreme()
+        self.rotate_arm_to_left_extreme() #should make this rotate left and then right or reverse
         self.CAMERA.add_detection_task("detect_colour")
         self.CAMERA.add_detection_colour(colour)
         
@@ -193,7 +250,6 @@ class RobotInterface(MasterPiInterface):
 
     # TO DO - Rotate robot until robot is aligned with arm_rotation - may need an IMU sensor
     def rotate_robot_to_arm_rotation(self, timelimit=5):
-        
         self.command = "rotate_robot_to_arm_rotation"
         data = {}
         data['command'] = self.command
@@ -203,18 +259,6 @@ class RobotInterface(MasterPiInterface):
         data['endtime'] = time.time()
         return data
     
-    # TO DO - orbit the coloured target until target angle is horizontal
-    def orbit_target(self, colour='red', timelimit=5):
-        
-        self.command = "orbit_target"
-        data = {}
-        data['command'] = self.command
-        data['starttime'] = time.time()
-        self.stop_command()
-        self.CAMERA.end_detection()
-        data['endtime'] = time.time()
-        return data
-
     # Rotate arm until current colour in view is centered
     def rotate_arm_until_colour_detected_is_centered(self, colour="red", timelimit=10):
         self.look_down() #must be in look down mode
@@ -318,64 +362,7 @@ class RobotInterface(MasterPiInterface):
         data['endtime'] = time.time()
         
         return data
-    
-    # Moves towards an object in camera view
-    def move_toward_colour_detected(self, colour="red", timelimit=5, mode='turning'):
-        
-        self.command = "move_toward_colour_detected"
-        data = {}
-        data['command'] = self.command
-        data['starttime'] = time.time()
-        self.set_boardLED_color(colour)
-        self.CAMERA.add_detection_task("detect_colour")
-        self.CAMERA.add_detection_colour(colour)
-        self.set_boardLED_color(colour)
-        endtime = time.time() + timelimit
-        centered = False
-        
-        distance = 145
-        if self.camera_pos == "lookdown":
-            distance = 250
-        elif self.camera_pos == "lookup":
-            distance = 90
-        elif self.camera_pos == "default":
-            distance = 145    
-            
-        while ((time.time() < endtime) and (self.command == "move_toward_colour_detected")):
-            if not self.show_camera_window():
-                break
-            
-            temp_data = self.CAMERA.get_detection_data()
-            data.update(temp_data)
-            #time.sleep(0.05)
-            
-            if 'detect_colour' in data:
-                if colour in data['detect_colour']:
-                    if 'found' in data['detect_colour'][colour]:
-                        rect = data['detect_colour'][colour]['rect']
-                        center, size, angle = rect
-                        x, y = center
-                        deltaY = 480-y
-                        deltaX = 320-x
-                        theta_degrees = int(math.degrees(math.atan2(deltaX,deltaY)) + 90)
-                        
-                        if deltaY > distance:
-                            if mode == 'drifting':
-                                self.move_direction(power=33, direction=theta_degrees, rotationspeed=0)
-                            elif mode == 'turning':
-                                turn = round(math.radians(theta_degrees-90)/8, 2)
-                                if abs(turn) <= 0.01:
-                                    turn = 0
-                                self.move_direction(power=33, direction=90, rotationspeed=-turn)
-                        else:
-                            self.move_direction_time(direction=270, rotationspeed=0, power=33, timelimit=0.2)
-                            break
-                
-        self.stop_command()        
-        self.CAMERA.end_detection()
-        data['endtime'] = time.time()
-        return data
-
+ 
     # Show a camera window until q is pressed - use for debugging purposes
     def show_camera_window(self):
         if not self.show_camera:
@@ -398,7 +385,7 @@ class RobotInterface(MasterPiInterface):
         endtime = time.time() + timelimit
         
         #self.CAMERA.detection_data_expire_time = 0 #when auto_detection is turned off, the expire time will be reset
-        self.CAMERA.detect_all(exclude_colours=['black','white'])
+        self.CAMERA.detect_all()
         
         while ((time.time() < endtime) and (data['command'] == "auto_detection")): #this can not be running when automated_mode is on
             if not self.show_camera_window():
@@ -431,30 +418,38 @@ if __name__ == '__main__':
     print("\033c")
     input("Press Enter to Start")
     ROBOT.CAMERA.create_detection_window()
-    ROBOT.show_camera = True #show camera window must be inside each loop
+    ROBOT.show_camera = True #show camera window must be inside each movement loop
     ROBOT.reset_arm()
     ROBOT.stop()
     print("Voltage: ",ROBOT.get_voltage())
     ROBOT.look_up()
-    ROBOT.auto_detection(timelimit=5)
+    ROBOT.auto_detection(timelimit=10)
     ROBOT.SOUND.say("Robot ready")
-    ROBOT.move_direction_until_detection(movetype="forward", distanceto=250, detection_types=['colour'],
-                                       detection_colours=['blue'])
-    time.sleep(1)
-    ROBOT.move_toward_colour_detected(colour="blue", timelimit=5, mode='turning')
+    input("Press Enter to move until a detection is made: ")
+    ROBOT.SOUND.load_mp3("static/music/missionimpossible.mp3")
+    ROBOT.SOUND.play_music(1)
+    
+    data = ROBOT.move_direction_until_detection(movetype="forward", distanceto=250, detection_types=['colour'],
+                                       detection_colours=['blue'], timelimit=3)
+    print(data)
+    input("Press Enter to move toward colour detected")
+    data = ROBOT.move_toward_colour_detected(colour="blue", timelimit=3, mode='turning')
+    print(data)
     time.sleep(1)
     temp = ROBOT.get_infra_object()
     print("TEMP", temp)
     ROBOT.look_down()
     time.sleep(1)
-    ROBOT.move_toward_colour_detected(colour="blue", timelimit=5, mode='turning')
+    input("Press Enter to move closer to colour detected")
+    data = ROBOT.move_toward_colour_detected(colour="blue", timelimit=3, mode='turning')
     time.sleep(1)
-    data = ROBOT.rotate_arm_until_colour_detected_is_centered("red",timelimit=5)
+    data = ROBOT.rotate_arm_until_colour_detected_is_centered("blue",timelimit=5)
+    input("Press Enter to pickup color")
     ROBOT.pick_up_centered_object_with_look_down(data['y'])
-    #ROBOT.SOUND.say("Move until detection")
-    #ROBOT.move_direction_until_detection(movetype="forward", distanceto=250, detection_types=['colour'],
-    #detection_colours=['red','green'], timelimit=5, confirmlevel=2)
-    #ROBOT.auto_detection(timelimit=15)
+    input("Press Enter to put down color")
+    ROBOT.put_down_object()
+    ROBOT.reset_arm()
+    ROBOT.SOUND.stop_music()
     ROBOT.stop()
     time.sleep(1)
     ROBOT.shutdown()

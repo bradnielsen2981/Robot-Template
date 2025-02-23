@@ -3,14 +3,18 @@
 # The self.command and self.Routine are important because they can keep track of robot functions and commands. 
 # Remember Flask is using Threading (e.g. more than once process which can confuse the robot)
 from interfaces.robotinterface import RobotInterface
+from interfaces.databaseinterface import Database
 import logging, sys, os, time
 
 class Robot(RobotInterface): 
     
     def __init__(self, DATABASE):
         super().__init__()
-        self.DATABASE = DATABASE
-        self.routine = "ready" #use this stop or start routines
+        if DATABASE == None:
+            DATABASE = Database("databases/test.db")
+        else:
+            self.DATABASE = DATABASE
+        self.routine = "ready" #use this stop or start routines - remember Flask works by using Threading
         return
      
     # Write a function for automated search
@@ -20,7 +24,7 @@ class Robot(RobotInterface):
         return
     
     def stop_automated_search(self):
-        self.routine = "ready"
+        self.routine = 'ready'
         self.logger.info('Stop Automated Search')
         return
     

@@ -279,7 +279,7 @@ class CameraInterface():
                             cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (0, 255, 0), 2)
 
                             # Label with class and confidence
-                            label = f"Class {class_label}: {confidence:.2f}"
+                            label = f"Class: {class_label} | {confidence:.2f}"
                             cv2.putText(frame, label, (x_min, y_min - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
                 end = time.time()
@@ -711,8 +711,8 @@ if __name__ == '__main__':
     CAMERA.start()
     CAMERA.create_detection_window()
     time.sleep(1)
-    CAMERA.add_detection_task('detect_colour')
-    CAMERA.add_detection_colour('red')
+    #CAMERA.add_detection_task('detect_colour')
+    #CAMERA.add_detection_colour('red')
     CAMERA.load_detection_model()
     CAMERA.add_detection_task('detect_model')
     #CAMERA.detect_all()

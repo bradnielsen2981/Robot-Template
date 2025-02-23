@@ -101,7 +101,7 @@ class MasterPiInterface():
         self.stop()
         return
     
-    # Rotate forever - this is dangerous - you must called stop() afterwards or it will spin forever
+    # Rotate forever - DANGEROUS AS THERE IS NO TIMELIMIT
     def rotate_speed(self, rotationspeed=0.1):
         self.status = "Rotating"
         self.chassis.set_velocity(24, 90, rotationspeed) 
@@ -109,6 +109,8 @@ class MasterPiInterface():
     
     # Move in the direction the chasis travels in. 90 is forward, 0 is right, 180 left.
     def move_direction_time(self, power=35, direction=90, rotationspeed=0, timelimit=5):
+        if power > 40:
+            power = 40
         self.status = "Moving"
         self.chassis.set_velocity(power, direction, rotationspeed) 
         endtime = time.time() + timelimit
@@ -117,12 +119,77 @@ class MasterPiInterface():
         self.stop()
         return
     
-    # Move in the direction, this is dangerous, you must call stop() afterwards or it will move forward forever
+    # Move in the direction, - DANGEROUS AS THERE IS NO TIMELIMIT
     def move_direction(self, power=35, direction=90, rotationspeed=0):
+        if power > 40:
+            power = 40
         self.status = "Moving"
         self.chassis.set_velocity(power, direction, rotationspeed) 
         return
     
+    #slide in a direction - DANGEROUS AS THERE IS NO TIMELIMIT
+    def slide(self, power=33, slide="left"):
+        if power > 40:
+            power = 40
+        self.status = "Sliding"
+        if slide == 'left':
+            direction = 180
+        elif slide == 'right':
+            direction = 0
+        self.chassis.set_velocity(power, direction, 0)
+        return
+
+    #slide for a period of time
+    def slide_time(self, power=33, slide="left", timelimit=1):
+        if power > 40:
+            power = 40
+        self.status = "Sliding"
+        rotationspeed = 0
+        if slide == 'left':
+            direction = 180
+        elif slide == 'right':
+            direction = 0
+        endtime = time.time() + timelimit
+        self.chassis.set_velocity(33, direction, rotationspeed)
+        while ((time.time() < endtime) and (self.status == "Sliding")):
+            continue
+        self.stop()    
+        return
+    
+    #slide in a direction - DANGEROUS AS THERE IS NOT TIMELIMIT
+    def orbit_slide(self, power=33, slide="left"):
+        if power > 40:
+            power = 40
+        self.status = "Orbitting"
+        if slide == 'left':
+            direction = 180
+            rotationspeed=0.08
+        elif slide == 'right':
+            rotationspeed=-0.08
+            direction = 0
+        self.chassis.set_velocity(power, direction, rotationspeed)
+        return
+    
+    #orbit for a period of time
+    def orbit_slide_time(self, power=33, slide="left", timelimit=1):
+        if power > 40:
+            power = 40
+        self.status = "Orbitting"
+        rotationspeed = 0
+        if slide == 'left':
+            direction = 180
+            rotationspeed=0.08
+        elif slide == 'right':
+            rotationspeed=-0.08
+            direction = 0
+        endtime = time.time() + timelimit
+        self.chassis.set_velocity(33, direction, rotationspeed)
+        while ((time.time() < endtime) and (self.status == "Orbitting")):
+            continue
+        self.stop()    
+        return
+
+    #get the status
     def get_status(self):
         return self.status
 
@@ -185,7 +252,13 @@ class MasterPiInterface():
         Board.setPWMServoPulse(1, 1600, 2000) 
         time.sleep(2)
         return
-    
+
+    #put down current object
+    def put_down_object(self):
+        self.run_arm_action("putdown")
+        
+        return
+
     #rotate the arm between 500 and 2500
     def rotate_arm(self, rotation=100):
         
@@ -211,9 +284,12 @@ if __name__ == '__main__':
     ROBOT = MasterPiInterface()
     print("\033c")
     time.sleep(3)
-    v = ROBOT.get_voltage()/1000
-    ROBOT.reset_arm()
+    v = ROBOT.get_voltage()
     print(v)
+    ROBOT.reset_arm()
+    input("Press Enter to Slide")
+    ROBOT.orbit_slide_time(slide="left", timelimit=3)
+    
     '''
     
     ROBOT.stop()

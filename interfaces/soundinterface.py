@@ -65,6 +65,7 @@ if __name__ == "__main__":
     print("\033c")
     print("HERE")
     SOUND.load_mp3("static/music/missionimpossible.mp3")
+    input("Press Enter to start:")
     SOUND.say("Hello, my name is WALLEE")
     SOUND.play_music(1)
     response = input("Press Enter to stop")

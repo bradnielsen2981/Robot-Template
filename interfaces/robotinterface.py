@@ -30,7 +30,7 @@ class RobotInterface(MasterPiInterface):
         return
 
     # Move in direction until distance from detection. Movetypes can be none, forward, turn, circle, slideright, slideleft 
-    # Multiple detection types can be included: sonar, line, colour, model, letter, all. (Model and letter has not been implemented)
+    # Multiple detection types can be included: sonar, line, colour, model, all. (Model has not been implemented)
     # Confirmlevel is the number of unique detection types required before a stop. Colours can count as more than.
     def move_direction_until_detection(self, movetype="forward", distanceto=250, detection_types=['colour'],
                                        detection_colours=['red'], timelimit=5, confirmlevel=1):
@@ -52,9 +52,6 @@ class RobotInterface(MasterPiInterface):
                 
             if 'model' in detection_types: #TODO: add detect_model to camera
                 self.CAMERA.add_detection_task("detect_model")
-                
-            if 'letter' in detection_types: #TODO: add detect_model to camera
-                self.CAMERA.add_detection_task("detect_letter")
           
         time.sleep(1) #camera needs time to get ready..
         data['starttime'] = time.time()
@@ -150,9 +147,6 @@ class RobotInterface(MasterPiInterface):
                         continue
                 
             if 'model' in detection_types or 'all' in detection_types: 
-                pass # Detect_model has not been implemented in the CameraInterface
-            
-            if 'letter' in detection_types or 'all' in detection_types: 
                 pass # Detect_model has not been implemented in the CameraInterface
         
             self.CAMERA.set_output_message(output_message)

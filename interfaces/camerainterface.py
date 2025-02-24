@@ -72,7 +72,7 @@ class CameraInterface():
         self.detection_colours = []
         self.detection_model = None
         self.detection_model_labels = None
-        self.detection_model_confidence_level = 0.6
+        self.detection_model_confidence_level = 0.7
         self.input_shape = None
         self.detect_once = False #used if you only want to do one detection
         self.colour_shift = 0 #if more than one colour, colour will shift each frame
@@ -384,7 +384,6 @@ class CameraInterface():
 
         return frame, data
 
-
     # Detect an object based on a model - could use teachable machine to create a model
     def detect_model(self, frame):
 
@@ -514,7 +513,6 @@ class CameraInterface():
 
         return frame, data
 
-
     # Load the detection model
     def load_detection_model(self, model_file="models/yolov5s-int8-224_edgetpu.tflite", classes_file="models/coco.names"):
 
@@ -528,7 +526,7 @@ class CameraInterface():
         # Load COCO class labels
         with open(classes_file, "r") as f:
             self.detection_model_labels = [line.strip() for line in f.readlines()] 
-            print(self.detection_model_labels)    
+            #print(self.detection_model_labels)    
         return
     
     # Get current rendered frame

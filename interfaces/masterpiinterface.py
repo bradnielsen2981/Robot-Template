@@ -126,69 +126,40 @@ class MasterPiInterface():
         self.status = "Moving"
         self.chassis.set_velocity(power, direction, rotationspeed) 
         return
-    
-    #slide in a direction - DANGEROUS AS THERE IS NO TIMELIMIT
-    def slide(self, power=33, slide="left"):
-        if power > 40:
-            power = 40
-        self.status = "Sliding"
-        if slide == 'left':
+        
+    # slide in a direction - DANGEROUS AS THERE IS NO TIMELIMIT
+    def slide_direction(self, power=50, direction="left"):
+        if power > 50:
+            power = 50
+        self.status = 'Drifting'
+        if direction == 'left':
             direction = 180
-        elif slide == 'right':
+            rotationspeed = 0.3
+        elif direction == 'right':
             direction = 0
-        self.chassis.set_velocity(power, direction, 0)
+            rotationspeed = -0.3
+        self.chassis.set_velocity(power, direction, rotationspeed)  
         return
-
-    #slide for a period of time
-    def slide_time(self, power=33, slide="left", timelimit=1):
-        if power > 40:
-            power = 40
-        self.status = "Sliding"
-        rotationspeed = 0
-        if slide == 'left':
-            direction = 180
-        elif slide == 'right':
-            direction = 0
+    
+    # slide for a period of time
+    def slide_direction_time(self, power=50, direction="left", timelimit=2):
+        if power > 50:
+            power = 50
+        self.status = 'Drifting'
+        d = 0
+        if direction == 'left':
+            d = 180
+            rotationspeed = 0.3
+        elif direction == 'right':
+            d = 0
+            rotationspeed = -0.3
         endtime = time.time() + timelimit
-        self.chassis.set_velocity(33, direction, rotationspeed)
-        while ((time.time() < endtime) and (self.status == "Sliding")):
+        self.chassis.set_velocity(power, d, rotationspeed)
+        while ((time.time() < endtime) and (self.status == 'Drifting')):
             continue
         self.stop()    
         return
     
-    #slide in a direction - DANGEROUS AS THERE IS NOT TIMELIMIT
-    def orbit_slide(self, power=33, slide="left"):
-        if power > 40:
-            power = 40
-        self.status = "Orbitting"
-        if slide == 'left':
-            direction = 180
-            rotationspeed=0.08
-        elif slide == 'right':
-            rotationspeed=-0.08
-            direction = 0
-        self.chassis.set_velocity(power, direction, rotationspeed)
-        return
-    
-    #orbit for a period of time
-    def orbit_slide_time(self, power=33, slide="left", timelimit=1):
-        if power > 40:
-            power = 40
-        self.status = "Orbitting"
-        rotationspeed = 0
-        if slide == 'left':
-            direction = 180
-            rotationspeed=0.08
-        elif slide == 'right':
-            rotationspeed=-0.08
-            direction = 0
-        endtime = time.time() + timelimit
-        self.chassis.set_velocity(33, direction, rotationspeed)
-        while ((time.time() < endtime) and (self.status == "Orbitting")):
-            continue
-        self.stop()    
-        return
-
     #get the status
     def get_status(self):
         return self.status
@@ -286,12 +257,11 @@ if __name__ == '__main__':
     time.sleep(3)
     v = ROBOT.get_voltage()
     print(v)
-    ROBOT.reset_arm()
+    #ROBOT.reset_arm()
     input("Press Enter to Slide")
-    ROBOT.orbit_slide_time(slide="left", timelimit=3)
+    ROBOT.slide_direction_time()
     
     '''
-    
     ROBOT.stop()
     input("Buzzer on")
     ROBOT.set_buzzer_time(1)

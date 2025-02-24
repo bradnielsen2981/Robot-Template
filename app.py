@@ -66,7 +66,7 @@ def lookup():
     app.logger.info('Looking Down')
     if ROBOT:
         ROBOT.SOUND.say("Look Down")
-        ROBOT.look_down()
+        ROBOT.look_up()
     return jsonify({'message':'look down'})
 
 # Stop
@@ -123,7 +123,7 @@ def stop():
 
 
  
-# CAMERA CODE-(do not touch!!)-------------------------------------------------------
+# CAMERA CODE-(do not touch this!!)-------------------------------------------------------
 # Continually gets the frame from the pi camera
 def videostream():
     """Video streaming generator function."""
@@ -152,7 +152,7 @@ def videofeed():
 def turn_on_detection():
     app.logger.info('turn on detection')
     if ROBOT:
-        ROBOT.CAMERA.detect_all(exclude_colours=['white','black'])
+        ROBOT.CAMERA.detect_all()
     return jsonify({'message':'Detection mode on!!'})
 
 # Turn off detection mode

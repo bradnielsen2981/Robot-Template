@@ -30,6 +30,8 @@ class Robot(RobotInterface):
     
 # Only execute if this is the main file, good for testing code
 if __name__ == '__main__':
+    print("\033c")
     ROBOT = Robot(None)
+    ROBOT.stop()
     input("Press enter to begin testing:")
     ROBOT.shutdown()

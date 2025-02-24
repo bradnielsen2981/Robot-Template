@@ -29,7 +29,7 @@ class RobotInterface(MasterPiInterface):
         self.stop()
         return
 
-    # Moves towards an object in camera view
+    # Moves towards an object in camera view - can either turn or slide
     def move_toward_colour_detected(self, colour="red", timelimit=5, mode='turning'):
         
         self.command = "move_toward_colour_detected"
@@ -86,11 +86,11 @@ class RobotInterface(MasterPiInterface):
         data['endtime'] = time.time()
         return data
 
-    # Move in direction until distance from detection. Movetypes can be none, forward, turn, circle, slideright, slideleft 
-    # Multiple detection types can be included: sonar, line, colour, model, all. (Model has not been implemented)
-    # Confirmlevel is the number of unique detection types required before a stop. Colours can count as more than.
-    def move_direction_until_detection(self, movetype="forward", distanceto=250, detection_types=['colour'],
-                                       detection_colours=['red'], timelimit=5, confirmlevel=1):
+    # Move in direction until detection. Movetypes can be none, forward, turn, circle, slideright, slideleft 
+    # Multiple detection types can be included: sonar, line, colour, model, all. 
+    # Confirmlevel is the number of unique detection types required before a stop.
+    def move_direction_until_detection(self, movetype='forward', distanceto=250, detection_types=['colour'],
+                                       detection_colours=['red'], timelimit=5, confirmlevel=1, target_class='person'):
         self.command = "move_direction_until_detection"
         data = {}
         data['command'] = self.command
@@ -123,13 +123,13 @@ class RobotInterface(MasterPiInterface):
             elif movetype == "turnleft":
                 self.rotate_speed(rotationspeed=-0.08)
             elif movetype == "circleright":
-                self.move_direction(power=38, direction=90, rotationspeed=0.08)
+                self.move_direction(power=35, direction=90, rotationspeed=0.08)
             elif movetype == "circleleft":
-                self.move_direction(power=38, direction=90, rotationspeed=-0.08)
+                self.move_direction(power=35, direction=90, rotationspeed=-0.08)
             elif movetype == "slideright":
-                self.move_direction(power=35, direction=0, rotationspeed=0)
+                self.move_direction(power=40, direction=0, rotationspeed=0)
             elif movetype == "slideleft":
-                self.move_direction(power=35, direction=-180, rotationspeed=0)    
+                self.move_direction(power=40, direction=-180, rotationspeed=0)    
         
         while ((time.time() < endtime) and (self.command == "move_direction_until_detection")):
             
@@ -143,7 +143,7 @@ class RobotInterface(MasterPiInterface):
                     
             if 'sonar' in detection_types or 'all' in detection_types:
                 sonar_distance = self.get_sonar_distance()
-                
+                print(sonar_distance)
                 data['detect_sonar'] = { 'distance':sonar_distance } #add sonar as a detection
                 self.CAMERA.output_message += " Sonar: " + str(sonar_distance)
                 
@@ -161,21 +161,23 @@ class RobotInterface(MasterPiInterface):
                 
                 if 'detect_line' in data:
                     if 'found' in data['detect_line']:
-                        line = data['detect_line']['line']
-                        cx = (line[0][0] + line[1][0]) / 2
-                        cy = (line[0][1] + line[1][1]) / 2
-                        center_point = (cx, cy)
-                        if (480-cy < distanceto):
-                            angle_rad = np.arctan2(line[1][1] - line[0][1], line[1][0] - line[0][0])
-                            angle = np.degrees(angle_rad)
-                            if angle < 45 and angle > -45: #only somewhat horizontal lines are detected
-                                print("Line detected!")
-                                if 'line' not in detections:
-                                    detections.append('line')
-                                    if len(detections) == confirmlevel:
-                                        break
-                            else: #detection_break = True #Do i break if i see a vertical line??
-                                pass
+
+                        if data['detect_line']['found']:
+                            line = data['detect_line']['line']
+                            cx = (line[0][0] + line[1][0]) / 2
+                            cy = (line[0][1] + line[1][1]) / 2
+                            center_point = (cx, cy)
+                            if (480-cy < distanceto):
+                                angle_rad = np.arctan2(line[1][1] - line[0][1], line[1][0] - line[0][0])
+                                angle = np.degrees(angle_rad)
+                                if angle < 45 and angle > -45: #only somewhat horizontal lines are detected
+                                    print("Line detected!")
+                                    if 'line' not in detections:
+                                        detections.append('line')
+                                        if len(detections) == confirmlevel:
+                                            break
+                                else: #detection_break = True #Do i break if i see a vertical line??
+                                    pass
                     num_detections_processed += 1
                     if num_detections_processed == len(detection_types): #skip the rest for efficiency
                         continue
@@ -187,15 +189,17 @@ class RobotInterface(MasterPiInterface):
                     for colour in data['detect_colour'].keys():
                         
                         if 'found' in data['detect_colour'][colour]:
-                            rect = data['detect_colour'][colour]['rect']
-                            center, size, angle = rect
-                            cx, cy = center
-                            #Do i ignore objects too far away. if cy < 100: 
-                            print(colour + " detected!")
-                            if colour not in detections:
-                                detections.append(colour)
-                                if len(detections) == confirmlevel:
-                                    break
+
+                            if data['detect_colour'][colour]['found']:
+                                rect = data['detect_colour'][colour]['rect']
+                                center, size, angle = rect
+                                cx, cy = center
+                                #Do i ignore objects too far away. if cy < 100: 
+                                print(colour + " detected!")
+                                if colour not in detections:
+                                    detections.append(colour)
+                                    if len(detections) == confirmlevel:
+                                        break
                     
                     if len(detections) == confirmlevel:
                         break
@@ -205,9 +209,24 @@ class RobotInterface(MasterPiInterface):
                         continue
                 
             if 'model' in detection_types or 'all' in detection_types: 
-                pass # Detect_model has not been implemented in the CameraInterface
-        
-               
+
+                if 'detect_model' in data:
+                    if 'found' in data['detect_model']:
+                        if data['detect_model']['found']:
+                            
+                            for target in data['detect_model']['targets']:
+                                class_label = target['class']
+                                if class_label == target_class:
+                                    
+                                    if 'model' not in detections:
+                                        print(class_label," detected!")
+                                        detections.append('model')
+                                        if len(detections) == confirmlevel:
+                                            break
+                                        
+                            if len(detections) == confirmlevel:
+                                break
+
         self.stop_command()
         self.CAMERA.end_detection()
         data['endtime'] = time.time()
@@ -415,43 +434,19 @@ class RobotInterface(MasterPiInterface):
 # TEST ROBOT CODE
 if __name__ == '__main__':
     ROBOT = RobotInterface()
+    ROBOT.stop()
     print("\033c")
-    input("Press Enter to Start")
+    input("Press Enter to Start: ")
     ROBOT.CAMERA.create_detection_window()
     ROBOT.show_camera = True #show camera window must be inside each movement loop
-    ROBOT.reset_arm()
-    ROBOT.stop()
+    #ROBOT.auto_detection(timelimit=10)
+    temp = ROBOT.get_infra_object()
+    print("Temp",temp)
     print("Voltage: ",ROBOT.get_voltage())
     ROBOT.look_up()
-    ROBOT.auto_detection(timelimit=10)
     ROBOT.SOUND.say("Robot ready")
-    input("Press Enter to move until a detection is made: ")
-    ROBOT.SOUND.load_mp3("static/music/missionimpossible.mp3")
-    ROBOT.SOUND.play_music(1)
-    
-    data = ROBOT.move_direction_until_detection(movetype="forward", distanceto=250, detection_types=['colour'],
-                                       detection_colours=['blue'], timelimit=3)
-    print(data)
-    input("Press Enter to move toward colour detected")
-    data = ROBOT.move_toward_colour_detected(colour="blue", timelimit=3, mode='turning')
-    print(data)
-    time.sleep(1)
-    temp = ROBOT.get_infra_object()
-    print("TEMP", temp)
-    ROBOT.look_down()
-    time.sleep(1)
-    input("Press Enter to move closer to colour detected")
-    data = ROBOT.move_toward_colour_detected(colour="blue", timelimit=3, mode='turning')
-    time.sleep(1)
-    data = ROBOT.rotate_arm_until_colour_detected_is_centered("blue",timelimit=5)
-    input("Press Enter to pickup color")
-    ROBOT.pick_up_centered_object_with_look_down(data['y'])
-    input("Press Enter to put down color")
-    ROBOT.put_down_object()
-    ROBOT.reset_arm()
-    ROBOT.SOUND.stop_music()
-    ROBOT.stop()
-    time.sleep(1)
-    ROBOT.shutdown()
+    #data = ROBOT.move_direction_until_detection(movetype='turnleft', distanceto=250, detection_types=['colour','sonar'], confirmlevel=2, detection_colours=['red'], timelimit=10)
+    #print(data)
+    #ROBOT.stop()
     sys.exit(0)
     

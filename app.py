@@ -1,3 +1,5 @@
+# Use Control + K and Control + 0 to minimise function names
+
 from flask import *
 from interfaces.databaseinterface import Database
 from interfaces.hashing import *

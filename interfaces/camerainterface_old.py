@@ -19,11 +19,14 @@ try:
     from pycoral.adapters import classify
     from pycoral.utils.edgetpu import list_edge_tpus
     tpu_devices = list_edge_tpus()
+
     if tpu_devices:
-        print("Edge TPU devices found:", tpu_devices)
+        if len(tpu_devices) > 0:
+            MODELDETECTION_ENABLED = True
+            print("Edge TPU devices found:", tpu_devices)
     else:
         print("No Edge TPU devices detected.")
-    MODELDETECTION_ENABLED = True
+        MODELDETECTION_ENABLED = False
 except:
     print("pycoral not installed. Model detection disabled.")
     MODELDETECTION_ENABLED = False
@@ -63,20 +66,19 @@ class CameraInterface():
         self.thread = None
         self.status = None
         self.frame = None
-        self.frameskip = 2
+        self.detection_task_frameskip = { 'detect_line':3, 'detect_model':7, 'detect_colour':2 } #detections tasks can slow down framerate, sets a frame skip
         self.detection_data = { } #detection dictionary will contain the name of the task and data that was detected
         self.detection_tasks = []
         self.detection_colours = []
         self.detection_model = None
         self.detection_model_labels = None
-        self.labels = None
-        self.input_details = None
-        self.output_details = None
+        self.detection_model_confidence_level = 0.7
+        self.input_shape = None
+        self.detect_once = False #used if you only want to do one detection
         self.colour_shift = 0 #if more than one colour, colour will shift each frame
-        self.task_shift = 0 #if more than one task, the task will shift each frame
         self.linecolour = "black"
         self.min_detection_area = 800
-        self.detection_data_expire_time = 1
+        self.detection_data_expire_time = 1 #data takes a second to expire
         self.clear_temp_detection_data = False
         self.output_text = True
         self.output_message = ""
@@ -97,6 +99,7 @@ class CameraInterface():
         
         try:
             self.capture = cv2.VideoCapture('http://127.0.0.1:8080?action=stream')
+            time.sleep(1)
             self.status = "Ready"
         except:
             self.status = "Fail"
@@ -112,7 +115,6 @@ class CameraInterface():
             self.currenttime = time.time()
             self.thread.start()
             self.status = "Running"
-            
         return
     
     # Function is run by thread...
@@ -123,7 +125,7 @@ class CameraInterface():
 
         #temp variables
         frame = None
-        framecount = 0
+        framecount = 1 #not 0 because it would immediately trigger all detection tasks
         framerate = 0.0
         detection_data = {}
         detection_tasks = None
@@ -134,6 +136,7 @@ class CameraInterface():
         while self.status == "Running":
 
             if self.paused: #pause the camera update
+                time.sleep(0.01)
                 continue
             try:
                 ret, img = self.capture.read()
@@ -149,7 +152,6 @@ class CameraInterface():
                 with self.clear_lock:
                     detection_data.clear()
                     self.colour_shift = 0
-                    self.task_shift = 0
                     self.clear_temp_detection_data = False
             
             #set detection tasks
@@ -157,90 +159,96 @@ class CameraInterface():
                 detection_tasks = self.detection_tasks
 
             #FRAME SKIP - only process every second frame
-            framecount+=1
-            if framecount>=self.frameskip:
-                framecount=0
-                
-                #get current time
-                currenttime = time.time()
-
-                if len(detection_tasks) != 0: #there are one or more detection tasks
-                                    
-                    active_detection_task = detection_tasks[self.task_shift] #with more than one detection task
-
-                    if len(detection_tasks) > 0:
-                        self.task_shift = (self.task_shift + 1)%len(detection_tasks)
-                
-                    #check for line detection
-                    if "detect_line" in detection_tasks:
-                        if 'detect_line' not in detection_data:
-                            detection_data['detect_line'] = {}
-
-                        if active_detection_task == None or active_detection_task == 'detect_line': 
-                            frame, data = self.detect_line(currenttime, frame, threshold=100, colour=self.linecolour)
-                            if data['found']:
-                                detection_data['detect_line'] = data.copy()
-                            else: #data['found'] == False
-                                if 'found' in detection_data['detect_line']: #expire old data
-                                    if (currenttime - detection_data['detect_line']['time']) > self.detection_data_expire_time:
-                                        detection_data['detect_line'] = {}  #clear old data  
+            currenttime = time.time()
             
-                    #check for colour detection
-                    if "detect_colour" in detection_tasks:
-                        if active_detection_task == None or active_detection_task == 'detect_colour':
-                            if 'detect_colour' not in detection_data:
-                                detection_data['detect_colour'] = {}
-                            
-                            colour = None
-                            if len(self.detection_colours) > 1:
-                                colour = self.detection_colours[self.colour_shift]
-                                self.colour_shift = (self.colour_shift+1)%len(self.detection_colours)
-                                
-                            elif len(self.detection_colours) == 1:
-                                colour = self.detection_colours[0]
-                            else:
-                                self.colour_shift = 0
-                                
-                            if colour != None:
-                                if colour in self.lab_colours.keys():
-                                    minC = np.array(self.lab_colours[colour]['min']) #min colour range
-                                    maxC = np.array(self.lab_colours[colour]['max']) #max colour range
-                                    
-                                    frame, data = self.detect_color(currenttime, frame, minC, maxC)
-                                    if data['found']:
-                                        detection_data['detect_colour'][colour] = data.copy()
-                                    
-                                    if colour in detection_data['detect_colour']:
-                                        if 'found' in detection_data['detect_colour'][colour]:
-                                            if (currenttime - detection_data['detect_colour'][colour]['time']) > self.detection_data_expire_time:
-                                                detection_data['detect_colour'] = {}  #clear old data
-
-                    #use neural network for detection using a tflite model                                
-                    if "detect_model" in detection_tasks: #i could use keras here...
-                        if active_detection_task == None or active_detection_task == 'detect_model':
-                            if 'detect_model' not in detection_data:
-                                detection_data['detect_model'] = {}
-
-                            frame, data = self.detect_model(currenttime, frame)
-                            if data['found']:
-                                detection_data['detect_model'] = data.copy()
-                            else:
-                                if 'found' in detection_data['detect_model']: #expire old data
-                                    if (currenttime - detection_data['detect_model']['time']) > self.detection_data_expire_time:
-                                        detection_data['detect_model'] = {}  #clear old data  
-                        
-                else:
-                    self.task_shift = 0
-                
-                #get current frame rate
+            if framecount == 9:
+                framecount = 2
                 elapsedtime = currenttime - self.currenttime
                 self.currenttime = currenttime
                 if elapsedtime > 0:
-                    framerate = round(self.frameskip/elapsedtime, 2) #it should be an average framerate 
-                #END FRAME SKIP
+                    framerate = round(7/elapsedtime, 2) #it should be an average framerate calculated over 19 frames
+            framecount+=1
+            taskcomplete = False 
+
+            if len(detection_tasks) != 0: #there are one or more detection tasks, all tasks should run on different frames
+                                
+                #check for line detection
+                if "detect_line" in detection_tasks and (framecount%self.detection_task_frameskip['detect_line']==0):
+                    start = time.time()    
+                    if 'detect_line' not in detection_data:
+                        detection_data['detect_line'] = {}
+
+                    frame, data = self.detect_line(frame, threshold=100, colour=self.linecolour) #CALL DETECTION
+                    if data['found']:
+                        detection_data['detect_line'] = data.copy()
+                    else: #data['found'] == False
+                        if 'found' in detection_data['detect_line']: #expire old data
+                            if (currenttime - detection_data['detect_line']['time']) > self.detection_data_expire_time:
+                                detection_data['detect_line'] = {}  #clear old data
+
+                    taskcomplete = True  
+                    end = time.time()
+                    #print("Detect Line time: ", end-start)
+
+                #check for colour detection
+                elif "detect_colour" in detection_tasks and (framecount%self.detection_task_frameskip['detect_colour']==0):
+                    start = time.time()
+                    if 'detect_colour' not in detection_data:
+                        detection_data['detect_colour'] = {}
+                    
+                    colour = None
+                    if len(self.detection_colours) > 1:
+                        colour = self.detection_colours[self.colour_shift]
+                        self.colour_shift = (self.colour_shift+1)%len(self.detection_colours)
+                        
+                    elif len(self.detection_colours) == 1:
+                        colour = self.detection_colours[0]
+                    else:
+                        self.colour_shift = 0
+                        
+                    if colour != None:
+                        if colour in self.lab_colours.keys():
+                            minC = np.array(self.lab_colours[colour]['min']) #min colour range
+                            maxC = np.array(self.lab_colours[colour]['max']) #max colour range
+                            
+                            frame, data = self.detect_color(frame, minC, maxC) #CALL DETECTION
+                            if data['found']:
+                                detection_data['detect_colour'][colour] = data.copy()
+                            
+                            if colour in detection_data['detect_colour']:
+                                if 'found' in detection_data['detect_colour'][colour]:
+                                    if (currenttime - detection_data['detect_colour'][colour]['time']) > self.detection_data_expire_time:
+                                        detection_data['detect_colour'] = {}  #clear old data
+                    taskcomplete = True
+                    end = time.time()
+                    #print("Detect Colour time: ", end-start)
+
+                #use neural network for detection               
+                elif "detect_model" in detection_tasks and (framecount%self.detection_task_frameskip['detect_model']==0):
+                    start = time.time()   
+                    if 'detect_model' not in detection_data:
+                        detection_data['detect_model'] = {}
+
+                    frame, data = self.detect_model(frame) #CALL DETECTION
+                    if data['found']:
+                        detection_data['detect_model'] = data.copy()
+                    else:
+                        if 'found' in detection_data['detect_model']: #expire old data
+                            if (currenttime - detection_data['detect_model']['time']) > self.detection_data_expire_time:
+                                detection_data['detect_model'] = {}  #clear old data
+
+                    taskcomplete = True
+                    end = time.time()
+                    #print("Total Detection Time: ", end-start)    
+
+                if self.detect_once and taskcomplete == True: #makes it so that only one detection occurs - does not clear detection data
+                    self.detection_tasks.clear()
+                    self.detect_once = False
+                    framecount = 1   
 
             # draw detection lines and boxes
-            if self.drawing:
+            if self.drawing and len(detection_tasks) > 0:
+                start = time.time()
                 if 'detect_line' in detection_data:
                     if 'found' in detection_data['detect_line']:
                         if detection_data['detect_line']['found']:
@@ -254,9 +262,33 @@ class CameraInterface():
                             box = cv2.boxPoints(data['rect'])
                             box = np.int0(box) # Convert to integer type
                             cv2.drawContours(frame, [box], 0, (0, 255, 0), 2)
-            
+
+                if 'detect_model' in detection_data:
+                    if 'found' in detection_data['detect_model']:
+                        for target in detection_data['detect_model']['targets']:
+                            
+                            # Draw bounding boxes on the frame
+                            x, y, width, height = target['rect']
+                            class_label = target['class']
+                            confidence = target['score']
+
+                            # Convert values to integers for OpenCV
+                            x_min, y_min = x, y
+                            x_max, y_max = x + width, y + height
+
+                            # Draw bounding box
+                            cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (0, 255, 0), 2)
+
+                            # Label with class and confidence
+                            label = f"Class: {class_label} | {confidence:.2f}"
+                            cv2.putText(frame, label, (x_min, y_min - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+                end = time.time()
+                #print("Drawing Time: ", end-start)
+
             # Write text if output_text is on - update the test every two seconds
             if self.output_text:
+                start = time.time()
                 coord = (10, 10)
                 cv2.putText(frame, "Frame rate: " + str(framerate), (coord[0], coord[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,0,255), 1, cv2.LINE_AA)
                 coord = (300, 10)
@@ -272,17 +304,21 @@ class CameraInterface():
                     for line in lines:
                         cv2.putText(frame, line, (coord[0], coord[1] + y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0,0,255), 1, cv2.LINE_AA)
                         y_offset += 20  # Adjust the vertical spacing between lines
-                    
+                end = time.time()
+                #print("Writing time: ", end-start)
+
+            start = time.time()
             with self.frame_lock:
                 self.frame = frame
                 
             with self.dict_lock:
                 self.detection_data = detection_data.copy()
-                
+            end = time.time()
+            #print("Frame Copy time: ", end-start)
         return
     
     # Detect line
-    def detect_line(self, currenttime, frame, threshold=150, colour=None):
+    def detect_line(self, frame, threshold=150, colour=None):
 
         data = {'found': False}
         frame_mask = None
@@ -319,7 +355,7 @@ class CameraInterface():
                 y2 = int(y0 - 1000 * (a))
 
                 # Calculate the length of the line
-                line_length = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+                line_length = int(np.sqrt((x2 - x1)**2 + (y2 - y1)**2))
 
                 # Update the longest line if the current line is longer
                 if line_length > longest_line_length:
@@ -327,12 +363,12 @@ class CameraInterface():
                     longest_line = ((x1, y1), (x2, y2))
 
             if longest_line:
-                data = {'found':True,'line':longest_line,'time':currenttime }
+                data = {'found':True,'line':longest_line,'time':time.time() }
 
         return frame, data
     
     # Detect a contour with colour and return the rectangle of the largest colour
-    def detect_color(self, currenttime, frame, minC, maxC):
+    def detect_color(self, frame, minC, maxC):
         
         frame_lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
         mask = cv2.inRange(frame_lab, minC, maxC) # Create a mask to isolate the colour regions
@@ -341,46 +377,159 @@ class CameraInterface():
         data = { 'found':False }
         
         if max_contour is not None: #colour range was found
-            target_rect = cv2.minAreaRect(max_contour) #make an area rectangle around the contour
-            data = { 'found':True, 'area':contour_area_max, 'rect':target_rect, 'time':currenttime }
+            rect = cv2.minAreaRect(max_contour) #make an area rectangle around the contour
+            (box_x, box_y), (box_w, box_h), angle = rect  # Extract values
+            target_rect = ((int(box_x), int(box_y)), (int(box_w), int(box_h)), int(angle))  # Convert to integers
+
+            data = { 'found':True, 'area':contour_area_max, 'rect':target_rect, 'time':time.time() }
 
         return frame, data
 
     # Detect an object based on a model - could use teachable machine to create a model
-    def detect_model(self, currenttime, frame):
-        data = {'found': None}
-        
+    def detect_model(self, frame):
+
+        data = {'found': False} 
+
         if not MODELDETECTION_ENABLED or self.detection_model is None:
+            print("No EDGETPU detected")
             return frame, data
+        
+        if self.detection_model == None:
+            print("Please load a detection model")
+            return frame, data
+            
 
-        size = common.input_size(self.detection_model)  # Ensure this is (416, 416)
+        f_height, f_width, _ = frame.shape
+        #print("FRAME height",h,"width",w)
+        
+        input_shape = self.input_details[0]['shape']  # Get shape of the first input tensor
+        i_height, i_width = input_shape[1], input_shape[2]  # Typically, shape is (batch, height, width, channels)
+        #print("INPUT height",height,"width",width)
 
-        # Use OpenCV's optimized preprocessing
-        blob = cv2.dnn.blobFromImage(frame, scalefactor=1.0, size=size, swapRB=True, crop=False)
+        # CROPPING
+        '''x_start = (w - width) // 2
+        y_start = (h - height) // 2
+        x_end = x_start + width
+        y_end = y_start + height
+        # Ensure the crop region is within bounds
+        cropped_frame = frame[y_start:y_end, x_start:x_end]
+        input_data = np.expand_dims(cropped_frame, axis=0)'''
 
-        # Convert from (1, 3, H, W) → (H, W, 3) for PyCoral
-        input_data = np.squeeze(blob, axis=0).transpose(1, 2, 0)  # Removes batch dimension, reorders axes
+        # Resize the image to 224x224
+        scaled_frame = cv2.resize(frame, (i_width, i_height))  # OpenCV uses (width, height) format
+        input_data = np.expand_dims(scaled_frame, axis=0)  # Add batch dimension
+        #print(f"Scale time: {end - start} seconds")
+    
+        # Set input tensor
+        self.detection_model.set_tensor(self.input_details[0]['index'], input_data)
 
-        # Convert input data type to match PyCoral's expected format
-        input_data = np.uint8(input_data)  # PyCoral expects uint8 tensor
-
-        # Set input tensor for the model
-        common.set_input(self.detection_model, input_data)
-
-        # Run inference
+        start = time.time()
         self.detection_model.invoke()
+        end = time.time()
+        #print("Detection Model time: ", end-start)
 
-        # Get output predictions
-        output_details = self.detection_model.get_output_details()[0]
-        predictions = self.detection_model.get_tensor(output_details['index'])
+        # Retrieve output tensor
+        output_details = self.detection_model.get_output_details()
+        #print(output_details)
 
-        if predictions is not None and len(predictions) > 0:
-            max_index = np.argmax(predictions)  # Get the class index with the highest probability
-            label = self.labels[max_index] if max_index < len(self.labels) else "Unknown"
-            print(f"Detected: {label}")
+        # Get the output data from the model
+        output_data = self.detection_model.get_tensor(output_details[0]['index'])
+        output_data = np.squeeze(output_data)  # Remove batch dimension
+
+        # Get the scale and zero_point for the quantization
+        scale, zero_point = output_details[0]['quantization']
+        #print("Scale:", scale)
+        #print("Zero Point:", zero_point)
+
+        targets = []
+
+        '''start = time.time()
+        for i in range(output_data.shape[0]):
+            row = output_data[i]
+            x, y, width, height = row[:4]
+            confidence = ((row[4] - zero_point) * scale).astype(np.float32)
+            class_probabilities = row[5:]
+            class_id = np.argmax(class_probabilities)  # Get class with highest score
+            class_label = self.detection_model_labels[class_id]
+            class_score = class_probabilities[class_id]
+
+            if confidence > self.detection_model_confidence_level:  # Confidence threshold
+
+                #scale back image size
+                x = int(x * (f_width/ i_width))
+                y = int(y * (f_height / i_height))
+                width = int(width * (f_width / i_width))
+                height = int(height * (f_height / i_height))
+
+                targets.append({ 'rect':[x,y,width,height], 'score':confidence, 'class':class_label })
+        end = time.time()
+        print("Post-processing time: ", end-start)'''
+
+        #TRYING THIS CODE INSTEAD OF ABOVE (THANKS CHATGPT)
+        start = time.time()
+        # Extract relevant columns using NumPy slicing
+        x, y, width, height = output_data[:, 0], output_data[:, 1], output_data[:, 2], output_data[:, 3]
+        confidence = ((output_data[:, 4] - zero_point) * scale).astype(np.float32)
+
+        # Get class IDs and scores in one step
+        class_probabilities = output_data[:, 5:]
+        class_ids = np.argmax(class_probabilities, axis=1)
+        class_scores = class_probabilities[np.arange(output_data.shape[0]), class_ids]
+
+        # Apply confidence threshold
+        mask = confidence > self.detection_model_confidence_level
+        x, y, width, height, confidence, class_ids = x[mask], y[mask], width[mask], height[mask], confidence[mask], class_ids[mask]
+
+        # Scale image size efficiently
+        scale_x = f_width / i_width
+        scale_y = f_height / i_height
+
+        x = np.multiply(x, scale_x).astype(int)
+        y = np.multiply(y, scale_y).astype(int)
+        width = np.multiply(width, scale_x).astype(int)
+        height = np.multiply(height, scale_y).astype(int)
+
+        # Convert results into a list of dictionaries
+        targets = [{'rect': [x[i], y[i], width[i], height[i]], 'score': confidence[i], 
+                    'class': self.detection_model_labels[class_ids[i]]} for i in range(len(x))]
+
+        end = time.time()
+        #print("Post-processing time: ", end-start)
+        #END CODE
+
+
+        # Apply non-maximum suppression
+        if len(targets) > 0:
+            boxes = np.array([target['rect'] for target in targets])
+            scores = np.array([target['score'] for target in targets])
+
+            # Perform NMS (threshold: 0.4 for IoU)
+            indices = cv2.dnn.NMSBoxes(boxes.tolist(), scores.tolist(), score_threshold=0.3, nms_threshold=0.4)
+            # Filter out boxes based on NMS indices
+            filtered_targets = [targets[i[0]] for i in indices]
+
+            data['found'] = True
+            data['time'] = time.time()
+            data['targets'] = filtered_targets
 
         return frame, data
 
+    # Load the detection model
+    def load_detection_model(self, model_file="models/yolov5s-int8-224_edgetpu.tflite", classes_file="models/coco.names"):
+
+        if not MODELDETECTION_ENABLED:
+            print("edge tpu not working")
+            return
+
+        self.detection_model = make_interpreter(model_file)
+        self.detection_model.allocate_tensors()
+        self.input_details = self.detection_model.get_input_details()
+        # Load COCO class labels
+        with open(classes_file, "r") as f:
+            self.detection_model_labels = [line.strip() for line in f.readlines()] 
+            #print(self.detection_model_labels)    
+        return
+    
     # Get current rendered frame
     def get_frame(self):
         with self.frame_lock:
@@ -389,10 +538,12 @@ class CameraInterface():
     # get a jpeg frame so to prepare for web stream
     def get_jpeg_frame(self, quality=50):
         with self.frame_lock:
-            #return cv2.imencode('.jpg', self.frame, [cv2.IMWRITE_JPEG_QUALITY, quality])[1].tobytes()
+            if self.frame is None:
+                return None
             ret, frame = cv2.imencode('.jpg', self.frame)
             if ret:
                 return frame.tobytes()
+        return None
     
     # get the current frame
     def save_frame_as_image(self):
@@ -413,10 +564,16 @@ class CameraInterface():
             self.clear_temp_detection_data = True #clear temporary detection data
         return
     
-    # add the detection task to be either 'detect_line', 'detect_colour', 'detect_letter', 'detect_model' - model not implemented yet
-    def add_detection_task(self, task):
+    # add the detection task to be either 'detect_line', 'detect_colour', 'detect_model' - model not implemented yet
+    def add_detection_task(self, task, detect_once=False):
+
+        if task not in ['detect_line', 'detect_colour', 'detect_model']:
+            print("Task must be one of: detect_line, detect_colour, detect_model")
+            return
+
         with self.task_lock:
             if task not in self.detection_tasks:
+                self.detect_once = detect_once
                 self.detection_tasks.append(task)
         return
     
@@ -433,10 +590,11 @@ class CameraInterface():
         return
     
     # Tests all detection tasks
-    def detect_all(self, exclude_colours=[]):
+    def detect_all(self, exclude_colours=['black','white']):
         self.add_detection_task('detect_colour')
         self.add_detection_task('detect_line')
-        #self.add_detection_task('detect_model')
+        self.load_detection_model()
+        self.add_detection_task('detect_model')
         
         # DETECT ALL COLOURS WITH A COLOUR SHIFT
         with self.colours_lock:
@@ -463,7 +621,8 @@ class CameraInterface():
     # remove a specific detection task
     def remove_detection_task(self, task):
         with self.task_lock:
-            self.detection_tasks.remove(task)
+            if task in self.detection_tasks:
+                self.detection_tasks.remove(task)
         return
     
     # Stop the detection task
@@ -498,24 +657,9 @@ class CameraInterface():
     
     #set the line detection colour
     def set_line_detection_colour(self, colour):
-        self.linecolour = "colour"
+        self.linecolour = colour
         return
-    
-    # Load the detection model
-    def load_detection_model(self, model_file, classes_file):
-        self.detection_model = make_interpreter(model_file)
-        self.detection_model.allocate_tensors()
-        
-        self.input_details = self.detection_model.get_input_details()
-        self.output_details = self.detection_model.get_output_details()
-        
-        #self.detection_model_labels = read_label_file(classes_file) 
-        
-        # Load COCO class labels
-        with open(classes_file, "r") as f:
-            self.labels = [line.strip() for line in f.readlines()]       
-        return
-    
+ 
     # Clear the detection model
     def clear_detection_model(self, model):
         self.detection_model = None
@@ -560,36 +704,26 @@ class CameraInterface():
         self.paused = False
         return
 
+
 #TEST CAMERA CODE 
 if __name__ == '__main__':
     input("Please press enter to begin: ")
     CAMERA = CameraInterface()
     print("\033c")
     CAMERA.start()
-    #CAMERA.load_detection_model("models/quant_coco-tiny-v3-relu_edgetpu.tflite", "models/cocov2.names")
-    #CAMERA.add_detection_task('detect_model')
+    CAMERA.create_detection_window()
+    time.sleep(1)
     #CAMERA.add_detection_task('detect_colour')
     #CAMERA.add_detection_colour('red')
-    CAMERA.create_detection_window()
-
-    prev_time = time.time()
-    frame_count = 0
+    CAMERA.load_detection_model()
+    CAMERA.add_detection_task('detect_model')
+    #CAMERA.detect_all()
+    
     while True:
         frame = CAMERA.get_frame()
         
         if frame is not None:
             cv2.imshow('Detection Mode', frame)
-
-            # FPS Calculation
-            frame_count += 1
-            current_time = time.time()
-            elapsed_time = current_time - prev_time
-
-            if elapsed_time >= 1.0:  # Update every second
-                fps = frame_count / elapsed_time
-                print(f"FPS: {fps:.2f}")
-                prev_time = current_time
-                frame_count = 0
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break

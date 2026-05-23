@@ -261,7 +261,7 @@ if __name__ == '__main__':
     input("Press Enter to Slide")
     ROBOT.slide_direction_time()
     
-    '''
+    
     ROBOT.stop()
     input("Buzzer on")
     ROBOT.set_buzzer_time(1)
@@ -292,5 +292,5 @@ if __name__ == '__main__':
     ROBOT.set_sonarLED_color("black")
     ROBOT.set_boardLED_color("black")
     ROBOT.stop()
-    '''
+    
 

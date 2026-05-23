@@ -3,7 +3,7 @@
 # As soon as the Hiwonder robot starts, an mpg server is running on port 8080
 # any time we want we can get the frame from the stream, and detect objects and lines
 
-import sys, os, time, queue, logging, threading, math
+import sys, os, time, queue, threading, math
 import cv2
 import numpy as np
 
@@ -11,7 +11,6 @@ sys.path.append('/home/pi/MasterPi')
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 
 import yaml_handle # lab colours
-from loggerinterface import setup_logger
 
 # TRY TO LOAD YOLO MODEL DETECTION USING EDGE TPU
 try:
@@ -81,18 +80,15 @@ def format_dict_with_line_breaks(d, indent=0):
 # The Camera Object
 class CameraInterface():
 
-    def __init__(self, timelimit=20, logger=None):
+    def __init__(self, timelimit=20):
         """
-        Initializes the Camera Interface, sets up logging, defines detection variables, 
+        Initializes the Camera Interface, defines detection variables, 
         loads color calibration data from YAML, and attempts to open the video stream.
         
         Args:
             timelimit (int, optional): General timelimit setting. Defaults to 20.
-            logger (logging.Logger, optional): Custom logger instance. Defaults to None.
         """
         self.timelimit = timelimit
-        self.logger = logger or logging.getLogger('CameraInterface')
-        setup_logger(self.logger, '../logs/camera.log')
         np.set_printoptions(suppress=True) # Disable scientific notation for clarity
         
         self.thread = None
@@ -133,7 +129,7 @@ class CameraInterface():
         try:
             self.lab_colours = yaml_handle.get_yaml_data(yaml_handle.lab_file_path)
         except Exception as e:
-            self.logger.warning(f"Could not load lab colours, using empty dictionary. Error: {e}")
+            print(f"Could not load lab colours, using empty dictionary. Error: {e}")
             self.lab_colours = {}
         
         try:
@@ -145,7 +141,7 @@ class CameraInterface():
         except Exception as e:
             self.status = "Fail"
             self.capture = None
-            self.logger.error(f"Video capture could not be accessed: {e}")
+            print(f"Video capture could not be accessed: {e}")
 
     def start(self):
         """
@@ -181,7 +177,7 @@ class CameraInterface():
                     continue
                 current_frame = img.copy()
             except Exception as e:
-                self.logger.debug(f"Frame read error: {e}")
+                # Silently catch frame read errors in headless mode
                 continue
             
             # Clear the temporary detection data when required
@@ -311,7 +307,6 @@ class CameraInterface():
             with self.dict_lock:
                 self.detection_data = local_detection_data.copy()
 
-    # Detect line
     def detect_line(self, frame, threshold=150, colour=None, min_length=240):
         """
         Uses OpenCV Canny edge detection and Probabilistic Hough Transform to find the longest straight line.
@@ -320,7 +315,7 @@ class CameraInterface():
             frame (numpy.ndarray): The current BGR video frame.
             threshold (int, optional): Accumulator threshold parameter. Defaults to 150.
             colour (str, optional): Target color to filter by (e.g., 'black', 'white'). Defaults to None.
-            min_length (int, optional): Minimum length of the line in pixels. Defaults to 1000.
+            min_length (int, optional): Minimum length of the line in pixels. Defaults to 240.
                                         WARNING: A 640x480 frame has a maximum diagonal of 800 pixels.
             
         Returns:
@@ -477,14 +472,20 @@ class CameraInterface():
     def load_detection_model(self, model_file="models/yolov5s-int8-224_edgetpu.tflite", classes_file="models/coco.names"):
         """
         Loads the TFLite neural network model into the PyCoral interpreter and loads COCO human-readable labels.
-        
-        Args:
-            model_file (str, optional): File path to the Edge TPU optimized model.
-            classes_file (str, optional): File path to the text file mapping class IDs to names.
+        Dynamically resolves relative paths to absolute paths based on the script's location.
         """
         if not MODELDETECTION_ENABLED:
             print("Edge TPU not enabled/working.")
             return
+
+        # Dynamically build the absolute path based on where this python file lives
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        if not os.path.isabs(model_file):
+            model_file = os.path.join(script_dir, model_file)
+            
+        if not os.path.isabs(classes_file):
+            classes_file = os.path.join(script_dir, classes_file)
 
         try:
             self.detection_model = make_interpreter(model_file)
@@ -494,7 +495,7 @@ class CameraInterface():
             with open(classes_file, "r") as f:
                 self.detection_model_labels = [line.strip() for line in f.readlines()] 
         except Exception as e:
-            self.logger.error(f"Failed to load model or labels: {e}")
+            print(f"Failed to load model or labels: {e}")
             self.detection_model = None
 
     def get_frame(self):
@@ -722,12 +723,12 @@ class CameraInterface():
             
     def pause(self):
         """Temporarily halts the processing of new frames in the background thread."""
-        self.logger.info("Pausing Camera")
+        print("Pausing Camera")
         self.paused = True
         
     def resume(self):
         """Resumes the processing of frames in the background thread."""
-        self.logger.info("Resuming Camera")
+        print("Resuming Camera")
         self.paused = False
 
 # TEST CAMERA CODE 
@@ -740,7 +741,7 @@ if __name__ == '__main__':
     time.sleep(1)
     
     CAMERA.load_detection_model()
-    CAMERA.detect_all()
+    #CAMERA.detect_all()
     
     try:
         while True:

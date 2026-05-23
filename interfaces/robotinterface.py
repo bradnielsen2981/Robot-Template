@@ -15,7 +15,7 @@ class RobotInterface(MasterPiInterface):
      
     def __init__(self):
         self.command = "Ready" # keep track of user commands
-        self.show_camera = False # only turn this on to see the camera window
+        self.show_camera = False # only turn this on to see the camera window, will slow down performance when using VNC
         self.SOUND = SoundInterface()
         
         self.CAMERA = CameraInterface()
@@ -461,7 +461,7 @@ if __name__ == '__main__':
     input("Press Enter to Start: ")
     
     ROBOT.CAMERA.create_detection_window()
-    ROBOT.show_camera = True 
+    ROBOT.show_camera = True #THIS WILL SLOW DOWN THE FRAME RATE IF ON VNC
     print("Voltage: ", ROBOT.get_voltage())
     
     ROBOT.look_up()

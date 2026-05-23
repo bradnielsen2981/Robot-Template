@@ -14,6 +14,10 @@ from camerainterface import CameraInterface
 class RobotInterface(MasterPiInterface):
      
     def __init__(self):
+        """
+        Initializes the Robot Interface, sets up sound and camera modules, 
+        and waits for hardware to warm up.
+        """
         self.command = "Ready" # keep track of user commands
         self.show_camera = False # only turn this on to see the camera window, will slow down performance when using VNC
         self.SOUND = SoundInterface()
@@ -26,14 +30,21 @@ class RobotInterface(MasterPiInterface):
         self.starttime = time.time() # when did robot get created
         return
     
-    # stop the robot in its current process
     def stop_command(self):
+        """Safely stops the robot's current movement process and resets the command state."""
         self.command = "Ready"
         self.stop()
         return
 
-    # Moves towards an object in camera view - can either turn or slide
     def move_toward_colour_detected(self, colour="red", timelimit=5, mode='turning'):
+        """
+        Instructs the robot to continuously track and move towards a specific color.
+        
+        Args:
+            colour (str): The color to track. Defaults to "red".
+            timelimit (int): Maximum time in seconds to execute the command. Defaults to 5.
+            mode (str): Movement style ('turning' or 'drifting'). Defaults to 'turning'.
+        """
         self.command = "move_toward_colour_detected"
         data = {
             'command': self.command,
@@ -49,7 +60,7 @@ class RobotInterface(MasterPiInterface):
         if self.camera_pos == "lookdown":
             distance = 250
         elif self.camera_pos == "lookup":
-            distance = 90 # FIXED: Removed the stray 'ac' typo here
+            distance = 90 
         elif self.camera_pos == "default":
             distance = 145    
             
@@ -59,7 +70,6 @@ class RobotInterface(MasterPiInterface):
             
             data.update(self.CAMERA.get_detection_data())
             
-            # Streamlined dictionary checking using .get()
             colour_data = data.get('detect_colour', {}).get(colour, {})
             if colour_data.get('found'):
                 center, size, angle = colour_data['rect']
@@ -85,10 +95,11 @@ class RobotInterface(MasterPiInterface):
         data['endtime'] = time.time()
         return data
 
-    # Move in direction until detection
-    # Fixed mutable default arguments (lists in function definition)
     def move_direction_until_detection(self, movetype='forward', distanceto=250, detection_types=None,
                                        detection_colours=None, timelimit=5, confirmlevel=1, target_class='person'):
+        """
+        Moves the robot in a specified pattern until a specific sensor or visual target is detected.
+        """
         if detection_types is None:
             detection_types = ['colour']
         if detection_colours is None:
@@ -138,11 +149,11 @@ class RobotInterface(MasterPiInterface):
                     
             if 'sonar' in detection_types or 'all' in detection_types:
                 sonar_distance = self.get_sonar_distance()
-                # print(sonar_distance)
                 data['detect_sonar'] = { 'distance': sonar_distance }
                 self.CAMERA.output_message += f" Sonar: {sonar_distance}"
                 
-                if sonar_distance < distanceto:
+                # Check 0 < sonar_distance to prevent false positives from sensor read errors
+                if 0 < sonar_distance < distanceto:
                     print("Sonar detected!")
                     if 'sonar' not in detections:
                         detections.append('sonar')
@@ -210,8 +221,8 @@ class RobotInterface(MasterPiInterface):
         data['endtime'] = time.time()
         return data
 
-    # Rotate arm clockwise from left to right to find a colour
     def rotate_arm_until_colour_detected(self, colour="red", timelimit=10):
+        """Rotates the mechanical arm from left to right until the specified color is centered."""
         self.command = "rotate_arm_until_colour_detected"
         data = {
             'command': self.command,
@@ -242,8 +253,8 @@ class RobotInterface(MasterPiInterface):
         data['arm_rotation'] = self.arm_rotation
         return data
 
-    # TO DO - Rotate robot until robot is aligned with arm_rotation
     def rotate_robot_to_arm_rotation(self, timelimit=5):
+        """TO DO - Rotate robot until robot is aligned with arm_rotation."""
         self.command = "rotate_robot_to_arm_rotation"
         data = {
             'command': self.command,
@@ -254,8 +265,8 @@ class RobotInterface(MasterPiInterface):
         data['endtime'] = time.time()
         return data
     
-    # Rotate arm until current colour in view is centered
     def rotate_arm_until_colour_detected_is_centered(self, colour="red", timelimit=10):
+        """Rotates the arm minutely to center the target color in the camera frame."""
         self.look_down() # must be in look down mode
         self.command = "rotate_arm_until_colour_detected_is_centered"
         data = {
@@ -297,8 +308,8 @@ class RobotInterface(MasterPiInterface):
         data['endtime'] = time.time()
         return data
 
-    # Pick up a centered colour object in the look down position
     def pick_up_centered_object_with_look_down(self, y):
+        """Executes the mechanical pickup sequence if the object is close enough in the Y-axis."""
         self.command = "pick_up_centered_object_with_look_down"
         data = {
             'command': self.command,
@@ -317,8 +328,8 @@ class RobotInterface(MasterPiInterface):
         data['endtime'] = time.time()
         return data
     
-    # Check if the pick up was successful
     def was_object_pickup_successful(self, colour='red', timelimit=10):
+        """Validates if the target object is currently being held in the claw."""
         self.command = "was_object_pickup_successful"
         self.CAMERA.add_detection_task("detect_colour")
         self.CAMERA.add_detection_colour(colour)
@@ -352,9 +363,14 @@ class RobotInterface(MasterPiInterface):
         data['endtime'] = time.time()
         return data
  
-    # Show a camera window until q is pressed
     def show_camera_window(self):
+        """
+        Renders the OpenCV display window. 
+        If disabled, it implements a small sleep to prevent headless CPU thrashing.
+        """
         if not self.show_camera:
+            # CRITICAL FIX: Add a small delay to prevent while-loops from running unthrottled
+            time.sleep(0.03) 
             return True
         
         frame = self.CAMERA.get_frame()
@@ -363,8 +379,8 @@ class RobotInterface(MasterPiInterface):
             return False
         return True
     
-    # Stationary auto detection
     def auto_detection(self, timelimit=100000000): 
+        """Runs the robot in a stationary mode, actively logging all visible targets."""
         self.command = "auto_detection"
         data = {
             'command': self.command,
@@ -407,9 +423,7 @@ class RobotInterface(MasterPiInterface):
         print("========================================\n")
         
         for task in tasks_to_test:
-            # 1. Clear the tasks so the camera stops looking
             self.CAMERA.clear_detection_tasks()
-            # 2. CLEAR THE DATA so the old text disappears instantly!
             self.CAMERA.clear_detection_data() 
             
             if task == 'baseline':
@@ -443,9 +457,8 @@ class RobotInterface(MasterPiInterface):
         self.CAMERA.end_detection()
         return
 
-    
-    # Shutdown the robot
     def shutdown(self):
+        """Safely powers down motors, stops camera threads, and clears LEDs."""
         self.command = "Shutdown"
         self.stop_command()
         self.CAMERA.stop()
@@ -456,23 +469,31 @@ class RobotInterface(MasterPiInterface):
 # TEST ROBOT CODE
 if __name__ == '__main__':
     ROBOT = RobotInterface()
-    ROBOT.stop()
-    print("\033c")
-    input("Press Enter to Start: ")
     
-    ROBOT.CAMERA.create_detection_window()
-    ROBOT.show_camera = True #THIS WILL SLOW DOWN THE FRAME RATE IF ON VNC
-    print("Voltage: ", ROBOT.get_voltage())
-    
-    ROBOT.look_up()
-    ROBOT.SOUND.say("Robot ready")
+    try:
+        ROBOT.stop()
+        print("\033c")
+        input("Press Enter to Start: ")
+        
+        ROBOT.CAMERA.create_detection_window()
+        ROBOT.show_camera = True # THIS WILL SLOW DOWN THE FRAME RATE IF ON VNC
+        print("Voltage: ", ROBOT.get_voltage())
+        
+        ROBOT.look_up()
+        ROBOT.SOUND.say("Robot ready")
 
-    # Test all detection tasks
-    ROBOT.cycle_through_all_detection_tasks(duration_per_task=20)
-    
-    # Uncomment below to test movements
-    #data = ROBOT.move_direction_until_detection(movetype='turnleft', distanceto=250, detection_types=['colour','sonar'], confirmlevel=2, detection_colours=['red'], timelimit=10)
-    #print(data)
-    ROBOT.stop()
-    
-    sys.exit(0)
+        # Test all detection tasks
+        ROBOT.cycle_through_all_detection_tasks(duration_per_task=20)
+        
+        # Uncomment below to test movements
+        # data = ROBOT.move_direction_until_detection(movetype='turnleft', distanceto=250, detection_types=['colour','sonar'], confirmlevel=2, detection_colours=['red'], timelimit=10)
+        # print(data)
+
+    except KeyboardInterrupt:
+        # Failsafe if you cancel the script mid-movement!
+        print("\n[!] Interrupted by user.")
+    finally:
+        # Guarantee the robot stops moving and shuts down cleanly
+        ROBOT.shutdown()
+        cv2.destroyAllWindows()
+        sys.exit(0)

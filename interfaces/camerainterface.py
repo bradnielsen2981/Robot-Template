@@ -91,9 +91,11 @@ class CameraInterface():
         self.timelimit = timelimit
         np.set_printoptions(suppress=True) # Disable scientific notation for clarity
         
+        self.reader_thread = None
         self.thread = None
         self.status = "Init"
         self.frame = np.zeros((480, 640, 3), dtype=np.uint8) # Default blank frame instead of None
+        self.raw_frame = None # Holds the absolute newest frame from the stream
         
         self.detection_task_frameskip = { 'detect_line':3, 'detect_model':7, 'detect_colour':2 }
         self.detection_data = {} 
@@ -145,18 +147,41 @@ class CameraInterface():
 
     def start(self):
         """
-        Starts the background camera thread if the camera initialized successfully.
-        The thread runs as a daemon, meaning it will close automatically when the main script ends.
+        Starts the background camera threads if the camera initialized successfully.
         """
         if self.status == "Ready":
             self.status = "Running"
             self.currenttime = time.time()
+            
+            # 1. Start the ultra-fast reader thread to prevent lag
+            self.reader_thread = threading.Thread(target=self._frame_reader, daemon=True)
+            self.reader_thread.start()
+            
+            # 2. Start the heavy processing thread
             self.thread = threading.Thread(target=self.update, args=(), daemon=True)
             self.thread.start()
 
+    def _frame_reader(self):
+        """
+        Ultra-fast background thread dedicated ONLY to pulling frames off the network stream.
+        This prevents the OpenCV buffer from filling up and causing video lag.
+        """
+        while self.status == "Running":
+            if self.paused:
+                time.sleep(0.01)
+                continue
+                
+            try:
+                ret, img = self.capture.read()
+                if ret and img is not None:
+                    with self.frame_lock:
+                        self.raw_frame = img
+            except Exception:
+                continue
+
     def update(self):
         """
-        The core loop executed by the background thread. Continuously reads frames from the stream, 
+        The core loop executed by the background thread. Processes the newest available frame, 
         calculates framerate, staggers detection tasks to prevent CPU bottlenecks, draws visual overlays, 
         and updates the shared data dictionaries safely.
         """
@@ -170,14 +195,16 @@ class CameraInterface():
             if self.paused:
                 time.sleep(0.01)
                 continue
-                
-            try:
-                ret, img = self.capture.read()
-                if not ret or img is None:
-                    continue
-                current_frame = img.copy()
-            except Exception as e:
-                # Silently catch frame read errors in headless mode
+            
+            # Grab the absolute newest frame from the reader thread safely
+            current_frame = None
+            with self.frame_lock:
+                if self.raw_frame is not None:
+                    current_frame = self.raw_frame.copy()
+            
+            # If the reader thread hasn't pulled a frame yet, wait a tiny bit
+            if current_frame is None:
+                time.sleep(0.01)
                 continue
             
             # Clear the temporary detection data when required
@@ -472,20 +499,10 @@ class CameraInterface():
     def load_detection_model(self, model_file="models/yolov5s-int8-224_edgetpu.tflite", classes_file="models/coco.names"):
         """
         Loads the TFLite neural network model into the PyCoral interpreter and loads COCO human-readable labels.
-        Dynamically resolves relative paths to absolute paths based on the script's location.
         """
         if not MODELDETECTION_ENABLED:
             print("Edge TPU not enabled/working.")
             return
-
-        # Dynamically build the absolute path based on where this python file lives
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        
-        if not os.path.isabs(model_file):
-            model_file = os.path.join(script_dir, model_file)
-            
-        if not os.path.isabs(classes_file):
-            classes_file = os.path.join(script_dir, classes_file)
 
         try:
             self.detection_model = make_interpreter(model_file)
@@ -713,7 +730,7 @@ class CameraInterface():
         
     def stop(self):
         """
-        Initiates a graceful shutdown of the background camera thread and releases 
+        Initiates a graceful shutdown of the background camera threads and releases 
         the video capture device bindings.
         """
         self.status = "Stop"
@@ -741,7 +758,7 @@ if __name__ == '__main__':
     time.sleep(1)
     
     CAMERA.load_detection_model()
-    #CAMERA.detect_all()
+    CAMERA.detect_all()
     
     try:
         while True:

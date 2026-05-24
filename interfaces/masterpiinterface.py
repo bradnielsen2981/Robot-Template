@@ -31,18 +31,26 @@ class MasterPiInterface():
         Initializes the low-level hardware connections to the Hiwonder board, 
         including sonar, mecanum chassis, infrared, and sets up logging.
         """
+        self.logger = logging.getLogger('Robot')
+        setup_logger(self.logger, '../logs/robot.log')
+
         self.sonar = sonar.Sonar()
         self.sonar.setRGBMode(0)
         self.chassis = mecanum.MecanumChassis()
-        self.infrared = MLX90614.MLX90614()
+        
+        # Attempt to load the infrared sensor safely (Graceful Degradation)
+        try:
+            self.infrared = MLX90614.MLX90614()
+            self.has_infrared = True
+        except Exception as e:
+            self.infrared = None
+            self.has_infrared = False
+            self.logger.warning(f"Infrared sensor not found during init: {e}")
         
         time.sleep(0.5)
         self.status = "Ready"
         self.arm_rotation = 1500 # centre position
         self.camera_pos = "default"
-        
-        self.logger = logging.getLogger('Robot')
-        setup_logger(self.logger, '../logs/robot.log')
 
     def set_buzzer_time(self, timelimit=1):
         """Activates the board buzzer for a specified duration."""
@@ -59,12 +67,27 @@ class MasterPiInterface():
         return distance
     
     def get_infra_ambient(self):
-        """Reads the ambient environmental temperature via infrared."""
-        return round(self.infrared.get_amb_temp(), 2)
+        """Reads the ambient environmental temperature safely."""
+        if self.has_infrared:
+            try:
+                return round(self.infrared.get_amb_temp(), 2)
+            except Exception as e:
+                # If the read fails, log it and turn off the sensor flag to prevent future lag/crashes
+                self.logger.warning(f"Infrared ambient read failed: {e}")
+                self.has_infrared = False 
+                return 0.0
+        return 0.0
     
     def get_infra_object(self):
-        """Reads the temperature of the physical object in front of the infrared sensor."""
-        return round(self.infrared.get_obj_temp(), 2)
+        """Reads the object temperature safely."""
+        if self.has_infrared:
+            try:
+                return round(self.infrared.get_obj_temp(), 2)
+            except Exception as e:
+                self.logger.warning(f"Infrared object read failed: {e}")
+                self.has_infrared = False
+                return 0.0
+        return 0.0
 
     def set_sonarLED_colortuple(self, rgbtuple=(255, 0, 0)):
         """Sets the sonar 'eyes' using a direct RGB tuple."""

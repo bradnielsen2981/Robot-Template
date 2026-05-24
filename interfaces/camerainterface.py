@@ -96,8 +96,9 @@ class CameraInterface():
         self.status = "Init"
         self.frame = np.zeros((480, 640, 3), dtype=np.uint8) # Default blank frame instead of None
         self.raw_frame = None # Holds the absolute newest frame from the stream
+        self.new_frame_available = False # Flag to prevent processing the same frame twice
         
-        self.detection_task_frameskip = { 'detect_line':3, 'detect_model':7, 'detect_colour':2 }
+        self.detection_task_frameskip = { 'detect_line':3, 'detect_model':5, 'detect_colour':2 }
         self.detection_data = {} 
         self.detection_tasks = []
         self.detection_colours = []
@@ -176,6 +177,7 @@ class CameraInterface():
                 if ret and img is not None:
                     with self.frame_lock:
                         self.raw_frame = img
+                        self.new_frame_available = True # WE HAVE A NEW IMAGE!
             except Exception:
                 continue
 
@@ -196,15 +198,16 @@ class CameraInterface():
                 time.sleep(0.01)
                 continue
             
-            # Grab the absolute newest frame from the reader thread safely
+            # Grab the absolute newest frame ONLY if it is genuinely new
             current_frame = None
             with self.frame_lock:
-                if self.raw_frame is not None:
+                if self.new_frame_available and self.raw_frame is not None:
                     current_frame = self.raw_frame.copy()
+                    self.new_frame_available = False # Reset the flag!
             
-            # If the reader thread hasn't pulled a frame yet, wait a tiny bit
+            # If no new frame has arrived yet, sleep for a tiny fraction of a millisecond and check again
             if current_frame is None:
-                time.sleep(0.01)
+                time.sleep(0.005)
                 continue
             
             # Clear the temporary detection data when required
@@ -434,42 +437,61 @@ class CameraInterface():
         """
         data = {'found': False} 
 
+        # Abort if the model isn't loaded or EdgeTPU isn't running
         if not MODELDETECTION_ENABLED or self.detection_model is None or self.input_details is None:
             return frame, data
 
+        # Get original frame dimensions and required model dimensions
         f_height, f_width, _ = frame.shape
         input_shape = self.input_details[0]['shape']
         i_height, i_width = input_shape[1], input_shape[2] 
 
+        # Prepare the image for the neural network
         scaled_frame = cv2.resize(frame, (i_width, i_height))
         input_data = np.expand_dims(scaled_frame, axis=0)
     
+        # Run the EdgeTPU inference
         self.detection_model.set_tensor(self.input_details[0]['index'], input_data)
         self.detection_model.invoke()
 
+        # Retrieve the raw output tensor
         output_details = self.detection_model.get_output_details()
         output_data = np.squeeze(self.detection_model.get_tensor(output_details[0]['index']))
 
+        # Get quantization parameters to convert int8 back to floats
         scale, zero_point = output_details[0]['quantization']
 
         # Extract relevant columns using NumPy slicing (optimized)
-        x, y, width, height = output_data[:, 0], output_data[:, 1], output_data[:, 2], output_data[:, 3]
+        # YOLO format is [center_x, center_y, width, height]
+        center_x = output_data[:, 0]
+        center_y = output_data[:, 1]
+        width = output_data[:, 2]
+        height = output_data[:, 3]
         confidence = ((output_data[:, 4] - zero_point) * scale).astype(np.float32)
 
         class_probabilities = output_data[:, 5:]
         class_ids = np.argmax(class_probabilities, axis=1)
 
+        # Apply confidence mask early to save processing time on junk data
         mask = confidence > self.detection_model_confidence_level
-        x, y, width, height, confidence, class_ids = x[mask], y[mask], width[mask], height[mask], confidence[mask], class_ids[mask]
+        center_x, center_y = center_x[mask], center_y[mask]
+        width, height = width[mask], height[mask]
+        confidence, class_ids = confidence[mask], class_ids[mask]
 
+        # THE FIX: Convert YOLO center coordinates to top-left OpenCV coordinates
+        x_min_raw = center_x - (width / 2.0)
+        y_min_raw = center_y - (height / 2.0)
+
+        # Scale the coordinates back up to match the original 640x480 video frame
         scale_x = f_width / i_width
         scale_y = f_height / i_height
 
-        x = (x * scale_x).astype(int)
-        y = (y * scale_y).astype(int)
+        x = (x_min_raw * scale_x).astype(int)
+        y = (y_min_raw * scale_y).astype(int)
         width = (width * scale_x).astype(int)
         height = (height * scale_y).astype(int)
 
+        # Build the preliminary target list
         targets = [
             {
                 'rect': [x[i], y[i], width[i], height[i]], 
@@ -479,7 +501,7 @@ class CameraInterface():
             for i in range(len(x))
         ]
 
-        # Apply non-maximum suppression
+        # Apply Non-Maximum Suppression (NMS) to remove overlapping duplicate boxes
         if targets:
             boxes = np.array([t['rect'] for t in targets])
             scores = np.array([t['score'] for t in targets])
@@ -727,6 +749,80 @@ class CameraInterface():
         """Opens a standard OpenCV GUI window named 'Detection Mode' on the host screen."""
         cv2.namedWindow('Detection Mode')
         cv2.resizeWindow('Detection Mode', 640, 480)
+
+    def test_detection_performance(self, duration_per_task=5, show_window=True):
+        """
+        A standalone profiler to test the camera's performance without needing the full RobotInterface.
+        Cycles through a baseline and each detection algorithm.
+        
+        Args:
+            duration_per_task (int): How long to run each task in seconds. Defaults to 5.
+            show_window (bool): Whether to render the OpenCV window. Defaults to True.
+        """
+        tasks_to_test = ['baseline', 'detect_line', 'detect_colour', 'detect_model']
+        
+        # Pre-load dependencies
+        self.set_detection_colours(['red', 'green', 'blue'])
+        self.load_detection_model()
+        self.turn_on_output_text() 
+        
+        if show_window:
+            self.create_detection_window()
+        
+        print("\n========================================")
+        print(" STARTING STANDALONE CAMERA PROFILER")
+        print("========================================\n")
+        
+        abort_test = False
+        
+        for task in tasks_to_test:
+            if abort_test:
+                break
+                
+            # Clear previous tasks and data
+            self.clear_detection_tasks()
+            self.clear_detection_data() 
+            
+            if task == 'baseline':
+                print(f">>> Testing 'Baseline (No Detection)' for {duration_per_task} seconds...")
+                self.set_output_message("BASELINE - RAW FEED")
+            else:
+                print(f">>> Testing '{task}' for {duration_per_task} seconds...")
+                self.add_detection_task(task)
+                self.set_output_message(task.upper())
+            
+            endtime = time.time() + duration_per_task
+            
+            # Run the specific task for the allotted time
+            while (time.time() < endtime) and self.status == "Running":
+                if show_window:
+                    frame = self.get_frame()
+                    if frame.size > 0:
+                        cv2.imshow('Detection Mode', frame)
+                    
+                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                        abort_test = True
+                        break
+                else:
+                    # CPU saver for headless mode
+                    time.sleep(0.03)
+            
+            if abort_test:
+                print("\n[!] Test aborted by user.")
+                break 
+                
+        print("\n========================================")
+        print(" PROFILER COMPLETE ")
+        print("========================================\n")
+        
+        # Clean up
+        self.set_output_message("")
+        self.end_detection()
+        
+        if show_window:
+            cv2.destroyAllWindows()
+            
+        return
         
     def stop(self):
         """
@@ -750,30 +846,23 @@ class CameraInterface():
 
 # TEST CAMERA CODE 
 if __name__ == '__main__':
-    input("Please press enter to begin: ")
+    input("Please press enter to begin standalone camera test: ")
     CAMERA = CameraInterface()
     print("\033c")
-    CAMERA.start()
-    CAMERA.create_detection_window()
-    time.sleep(1)
-    
-    CAMERA.load_detection_model()
-    CAMERA.detect_all()
     
     try:
-        while True:
-            frame = CAMERA.get_frame()
-            
-            # Since get_frame now guarantees a valid frame, we don't need a None check, 
-            # but it's good practice to ensure it has data.
-            if frame.size > 0:
-                cv2.imshow('Detection Mode', frame)
-
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
+        # 1. Start the background threads
+        CAMERA.start()
+        time.sleep(2) # Give the camera and threads a moment to initialize
+        
+        # 2. Let the built-in profiler take over!
+        CAMERA.test_detection_performance(duration_per_task=10, show_window=True)
+        
     except KeyboardInterrupt:
-        print("Interrupted by user.")
+        # Catch Ctrl+C gracefully
+        print("\n[!] Interrupted by user.")
     finally:
+        # Guarantee the camera releases the video feed when done
         CAMERA.end_detection()
         CAMERA.stop()
         cv2.destroyAllWindows()

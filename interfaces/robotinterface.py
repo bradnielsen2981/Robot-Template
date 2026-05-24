@@ -138,7 +138,7 @@ class RobotInterface(MasterPiInterface):
             detection_colours = ['red']
             
         self.command = "move_direction_until_detection"
-        data = {'command': self.command}
+        data = {'command': self.command, 'movetype': movetype }
         detections = [] # Keeps track of which sensors have tripped
         
         # 1. Setup the camera tasks based on user arguments
@@ -584,11 +584,11 @@ if __name__ == '__main__':
         ROBOT.SOUND.say("Robot ready")
 
         # Test all detection tasks
-        ROBOT.cycle_through_all_detection_tasks(duration_per_task=20)
+        #ROBOT.cycle_through_all_detection_tasks(duration_per_task=20)
         
         # Uncomment below to test movements
-        # data = ROBOT.move_direction_until_detection(movetype='turnleft', distanceto=250, detection_types=['colour','sonar'], confirmlevel=2, detection_colours=['red'], timelimit=10)
-        # print(data)
+        data = ROBOT.move_direction_until_detection(movetype='turnleft', distanceto=250, detection_types=['colour','sonar'], confirmlevel=2, detection_colours=['red'], timelimit=10)
+        print(data)
 
     except KeyboardInterrupt:
         # Failsafe if you cancel the script mid-movement!

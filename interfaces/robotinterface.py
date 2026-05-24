@@ -585,9 +585,9 @@ if __name__ == '__main__':
 
         # Test all detection tasks
         #ROBOT.cycle_through_all_detection_tasks(duration_per_task=20)
-        
+
         # Uncomment below to test movements
-        data = ROBOT.move_direction_until_detection(movetype='turnleft', distanceto=250, detection_types=['colour','sonar'], confirmlevel=2, detection_colours=['red'], timelimit=10)
+        data = ROBOT.move_direction_until_detection(movetype='forward', distanceto=250, detection_types=['sonar','color'], confirmlevel=2, detection_colours=['red'], timelimit=10)
         print(data)
 
     except KeyboardInterrupt:

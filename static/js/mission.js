@@ -1,4 +1,4 @@
-/* This is your dashboard JavaScript, it has been embedded into dashboard.html */
+/* This is your mission JavaScript, it has been embedded into mission.html */
 
 function hide_dashboard()
 {
@@ -11,7 +11,7 @@ function hide_dashboard()
 function show_dashboard()
 {
     loader.style.display = 'none';
-    videofeed.innerHTML = '<img src="/videofeed" class="videofeed"></img>';
+    videofeed.innerHTML = '<img src="/videofeed" class="videofeed">';
     robot_buttons.style.display = "block";
     shutdown_robot_button.style.display = "block";
     load_robot_button.style.display = "none";

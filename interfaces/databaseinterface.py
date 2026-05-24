@@ -5,67 +5,68 @@
 #-----------------------------------------------------------------------#
 import sqlite3
 import logging
-import sys
+from contextlib import closing
 
- # Create the database by DATABASE = DatabaseInterface("test.sqlite")
 class Database:
 
-    #location is the sqlitedatabase file
-    def __init__(self, location="", log = logging.getLogger(__name__)):
+    def __init__(self, location="", log=None):
+        """Initializes the database connection parameters."""
         self.location = location
-        self.logger = log
-        return
+        # Safely default to the module logger if none is passed
+        self.logger = log or logging.getLogger(__name__)
 
-    # Returns a handle to the Database connection
     def connect(self):
+        """Returns a configured handle to the Database connection."""
         connection = sqlite3.connect(self.location)
-        connection.row_factory = sqlite3.Row #configures database queries to return a list of dictionaries (each row/record) [{"field1":value1,"field2":value2...},{etc},{} ]
+        connection.row_factory = sqlite3.Row 
+        
+        # Enable WAL mode for simultaneous reads/writes
+        connection.execute("PRAGMA journal_mode=WAL;") 
+        
         return connection
 
-    # A helper function to save time and also log sql errors
-    # Write your Select Query, and pass in a Tuple (a,b,c etc) representing any parameters
-    # If you only have one param, you still need to use a Tuple .e.g (userid,)
-    def ViewQuery(self, query, params=None):
-        connection = self.connect()
-        result = None
+    def ViewQuery(self, query, params=()):
+        """
+        Executes a SELECT query and returns the results.
+        Returns an empty list [] if no results are found or if an error occurs.
+        """
+        result = []
         try:
-            if params:
+            # closing() guarantees connection.close() is called when the block ends
+            with closing(self.connect()) as connection:
                 cursor = connection.execute(query, params)
-            else:
-                cursor = connection.execute(query)
-            result = cursor.fetchall() #returns a list of dictionaries
-        except (sqlite3.OperationalError, sqlite3.Warning, sqlite3.Error) as e:
-            self.logger.error("DATABASE ERROR: %s" % e)
-            self.logger.error(query)
-        connection.close()
-        if result:
-            return ([dict(row) for row in result]) #a list of dictionaries
-        else:
-            return False
+                records = cursor.fetchall()
+                if records:
+                    result = [dict(row) for row in records]
+                    
+        except sqlite3.Error as e:
+            self.logger.error(f"DATABASE ERROR: {e}")
+            self.logger.error(f"QUERY: {query}")
+            
+        return result
 
-    # Created a helper function so to save time and also log results
-    # Write your DELETE, INSERT, UPDATE Query, and pass in a Tuple(a,b,c etc ) representing any parameters
-    def ModifyQuery(self, query, params=None):
-        connection = self.connect()
-        result = None
+    def ModifyQuery(self, query, params=()):
+        """
+        Executes an INSERT, UPDATE, or DELETE query.
+        Returns True on success, False on failure.
+        """
+        success = False
         try:
-            if params:
-                connection.execute(query, params)
-            else:
-                connection.execute(query)
-            result = True
-        except (sqlite3.OperationalError, sqlite3.Warning, sqlite3.Error) as e:
-            self.logger.error("DATABASE ERROR: %s" % e)
-            self.logger.error(query)
-            result = False
-        connection.commit()
-        connection.close()
-        return result #Should be a true or false depending on success??
+            with closing(self.connect()) as connection:
+                # 'with connection:' automatically handles .commit() on success 
+                # and .rollback() if an exception is thrown
+                with connection:
+                    connection.execute(query, params)
+                success = True
+                
+        except sqlite3.Error as e:
+            self.logger.error(f"DATABASE ERROR: {e}")
+            self.logger.error(f"QUERY: {query}")
+            
+        return success
 
     def log(self, message):
         self.logger.info(message)
-        return
 
     def log_error(self, error):
         self.logger.error(error)
-        return

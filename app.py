@@ -4,7 +4,7 @@ from flask import *
 from interfaces.databaseinterface import Database
 from interfaces.hashing import *
 from robot import Robot
-import logging, time, sys
+import logging, time, sys, os, signal
 
 #---CONFIGURE APP---------------------------------------------------
 app = Flask(__name__)
@@ -49,7 +49,7 @@ def mission():
         loaded = 1
     return render_template('mission.html', robot_loaded=loaded)
 
-#load the robot
+# load the robot
 @app.route('/load_robot', methods=['GET','POST'])
 def load_robot():
     global ROBOT
@@ -62,13 +62,14 @@ def load_robot():
     return jsonify({'message':'robot loaded'})
 
 # YOUR FLASK CODE------------------------------------------------------------------------
-# Look Up
+
+# Look Down
 @app.route('/look_down', methods=['GET','POST'])
-def lookup():
+def look_down():
     app.logger.info('Looking Down')
     if ROBOT:
-        ROBOT.SOUND.say("Look Down")
-        ROBOT.look_up()
+        ROBOT.SOUND.say("Looking Down")
+        ROBOT.look_down()
     return jsonify({'message':'look down'})
 
 # Stop
@@ -81,51 +82,8 @@ def stop():
     return jsonify({'message':'stop'})
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
- 
 # CAMERA CODE-(do not touch this!!)-------------------------------------------------------
+
 # Continually gets the frame from the pi camera
 def videostream():
     """Video streaming generator function."""
@@ -187,14 +145,16 @@ def shutdown_robot():
 
 # Exit the web server
 @app.route('/exit', methods=['GET','POST'])
-def exit():
+def exit_app():
     app.logger.info("Exiting")
     shutdown_robot()
-    func = request.environ.get('werkzeug.server.shutdown')
-    func()
+    # Safely sends an interrupt signal to the current process
+    os.kill(os.getpid(), signal.SIGINT)
     return jsonify({'message':'Exiting'})
 
 #---------------------------------------------------------------------------
 # main method called web server application
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True) #runs a local server on port 5000
+    # CRITICAL: use_reloader=False prevents Flask from spawning a second process 
+    # which crashes the robot's hardware GPIO and Camera connections.
+    app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=False)
